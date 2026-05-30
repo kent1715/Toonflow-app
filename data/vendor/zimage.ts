@@ -347,7 +347,7 @@ const imageRequest = async (config: ImageConfig, _model: ImageModel): Promise<st
   const prompt = config.prompt;
 
   // w and h MUST be number type, not string
-  const params = {
+  const gradioNamedPayload = {
     p: prompt,
     w: Number(width),
     h: Number(height),
@@ -356,20 +356,27 @@ const imageRequest = async (config: ImageConfig, _model: ImageModel): Promise<st
     cfg: Number(cfg),
     vae: vaePath,
     llm: llmPath,
-    l_list: loras ? loras.split(",").map((s: string) => s.trim()) : [],
+    l_list: loras ? loras.split(",").map((s: string) => s.trim()).filter(Boolean) : [],
     l_str: Number(loraStrength),
   };
 
-  logger(`[zimage] request params: w=${params.w}(${typeof params.w}), h=${params.h}(${typeof params.h}), st=${params.st}, sd=${params.sd}, cfg=${params.cfg}`);
+  // v1 fallback still needs Gradio legacy payload shape: { data: params }
+  const params = gradioNamedPayload;
+
+  logger(`[zimage] request params: w=${gradioNamedPayload.w}(${typeof gradioNamedPayload.w}), h=${gradioNamedPayload.h}(${typeof gradioNamedPayload.h}), st=${gradioNamedPayload.st}, sd=${gradioNamedPayload.sd}, cfg=${gradioNamedPayload.cfg}`);
   logger(`[zimage] 开始生图 → prompt="${prompt.substring(0, 60)}..."`);
 
   // ===== 尝试1: Gradio v2 API =====
   try {
-    const v2Payload = { data: params };
     const v2Endpoint = `${baseUrl}/gradio_api/call/v2/${apiName}`;
 
     logger(`[zimage] submit endpoint used: POST ${v2Endpoint}`);
-    const submitResp = await axios.post(v2Endpoint, v2Payload, {
+    logger(`[zimage] v2 payload preview: ${JSON.stringify({
+      ...gradioNamedPayload,
+      p: String(gradioNamedPayload.p).substring(0, 120),
+    }).substring(0, 500)}`);
+
+    const submitResp = await axios.post(v2Endpoint, gradioNamedPayload, {
       headers: { "Content-Type": "application/json" },
       timeout: 300000,
     });
@@ -395,6 +402,8 @@ const imageRequest = async (config: ImageConfig, _model: ImageModel): Promise<st
     }
   } catch (e: any) {
     logger(`[zimage] v2 API 失败: ${e.message}`);
+    logger(`[zimage] v2 error status: ${e?.response?.status || ""}`);
+    logger(`[zimage] v2 error data: ${JSON.stringify(e?.response?.data || "").substring(0, 1000)}`);
   }
 
   // ===== 尝试2: Gradio v1 API (fallback) =====
