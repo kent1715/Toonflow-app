@@ -1,6 +1,6 @@
 /**
  * Toonflow AI供应商模板 - Z-Image Turbo 本地生图
- * @version 2.1
+ * @version 2.2
  *
  * 说明：
  * 1) 连接本地 Z-Image Turbo Gradio 服务
@@ -8,14 +8,16 @@
  * 3) 通过 Gradio API 调用生图（先尝试 v2，fallback v1）
  * 4) 仅支持图片生成，不支持文本/视频/TTS
  *
- * v2.1 changes:
- * - Gradio v2 submit endpoint: /gradio_api/call/v2/{apiName}
- * - Fallback v1: /gradio_api/call/{apiName}
- * - Named parameter payload: { p, w, h, st, sd, cfg, vae, llm, l_list, l_str }
- * - w/h enforced as number type
- * - FileData object parsing for Gradio results
- * - Local file path → base64 conversion
- * - Debug logging
+ * v2.2 changes:
+ * - parseGradioSSE: multi-line data concatenation per SSE spec
+ * - parseGradioSSE: fallback to raw JSON parse for non-SSE responses
+ * - pollGradioResult: Array.isArray(resultData) in object branch
+ * - pollGradioResult: "save result image" detection in object branch
+ * - pollGradioResult: Array.isArray(parsed) → completed immediately
+ * - extractImagePathFromText: JSON backslash unescape
+ * - resolveImageResult: log string path extraction before base64 fallback
+ * - resolveImageResult: array iterates ALL items, not raw[0]
+ * - Gradio v2 flat named payload preserved (NOT { data: params })
  */
 
 // ============================================================
@@ -129,7 +131,7 @@ declare const exports: {
 
 const vendor: VendorConfig = {
   id: "zimage",
-  version: "2.1",
+  version: "2.2",
   author: "Local AI",
   name: "Z-Image Turbo 本地生图",
   description:
@@ -175,20 +177,50 @@ const vendor: VendorConfig = {
 // 辅助函数
 // ============================================================
 
-/** Extract image file path from log text strings */
+/** Unescape JSON-encoded backslashes in extracted paths (\\ → \) */
+const unescapePath = (path: string): string => {
+  if (!path) return path;
+  // Replace double backslashes with single (JSON escape)
+  // But only if they look like path separators, not regex escapes
+  let result = path;
+  // Handle \\\\  → \\  (JSON double-escaped)
+  // Handle \\n   → \n  (JSON escaped newline in path — shouldn't exist but just in case)
+  // We want: D:\\Folder\\file.png → D:\Folder\file.png
+  if (result.includes("\\\\")) {
+    result = result.replace(/\\\\/g, "\\");
+  }
+  return result;
+};
+
+/** Extract image file path from log text strings like:
+ *  "save result image 0 to 'D:\Z-Image-Turbo-Windows\outputs\out_xxx.png' (success)"
+ *  Also handles JSON-escaped variants with double backslashes.
+ */
 const extractImagePathFromText = (text: string): string | null => {
   if (!text) return null;
 
   const patterns = [
+    // Pattern 1: save result image N to 'path' (success)  — with single quotes
     /save result image \d+ to '([^']+\.(?:png|jpg|jpeg|webp))'/i,
+    // Pattern 2: save result image N to "path" (success)  — with double quotes
     /save result image \d+ to "([^"]+\.(?:png|jpg|jpeg|webp))"/i,
-    /([A-Za-z]:[\/\\][^\r\n"'<>]+?\.(?:png|jpg|jpeg|webp))/i,
-    /(\/[^\r\n"'<>]+?\.(?:png|jpg|jpeg|webp))/i,
+    // Pattern 3: Windows absolute path (with single backslash)
+    /([A-Za-z]:[\/\\][^\r\n"'<>]*?\.(?:png|jpg|jpeg|webp))/i,
+    // Pattern 4: Linux absolute path
+    /(\/[^\r\n"'<>]*?\.(?:png|jpg|jpeg|webp))/i,
+    // Pattern 5: Windows path with double backslashes (JSON-escaped)
+    /([A-Za-z]:\\\\[^\r\n"'<>]*?\.(?:png|jpg|jpeg|webp))/i,
   ];
 
   for (const pattern of patterns) {
     const match = text.match(pattern);
-    if (match?.[1]) return match[1];
+    if (match?.[1]) {
+      const rawPath = match[1];
+      // Unescape JSON-encoded backslashes
+      const unescaped = unescapePath(rawPath);
+      logger(`[zimage] extractImagePathFromText: raw="${rawPath}" → unescaped="${unescaped}"`);
+      return unescaped;
+    }
   }
 
   return null;
@@ -243,39 +275,84 @@ const resolveImageResult = async (raw: any, baseUrl: string): Promise<string> =>
       }
     }
 
+    // Extract image path from log text (e.g. "save result image 0 to 'D:\\...\\out.png'")
+    const extractedPath = extractImagePathFromText(s);
+    if (extractedPath) {
+      logger(`[zimage] 从日志字符串中提取图片路径: ${extractedPath}`);
+      return await resolveImageResult(extractedPath, baseUrl);
+    }
+
     // 尝试作为纯 base64
     logger(`[zimage] 结果类型: 未知字符串，尝试base64解码 (长度=${s.length})`);
     return `data:image/png;base64,${s}`;
   }
 
-  // 2) 数组类型（Gradio 可能返回 [url] 或 [FileData] 或 [log strings]）
+  // 2) 数组类型（Gradio v2 may return [FileData] or [log strings] or mixed array）
   if (Array.isArray(raw)) {
-    logger(`[zimage] 结果类型: 数组 (长度=${raw.length})`);
+    logger(`[zimage] 结果类型: 数组 (长度=${raw.length}), 遍历所有item`);
 
     // First pass: look for FileData objects or extract path from log strings
-    for (const item of raw) {
+    for (let i = 0; i < raw.length; i++) {
+      const item = raw[i];
+      logger(`[zimage] 数组 item[${i}]: type=${typeof item}, preview=${JSON.stringify(item).substring(0, 200)}`);
+
       if (typeof item === "string") {
+        // Try extracting image path from log strings
         const extractedPath = extractImagePathFromText(item);
         if (extractedPath) {
-          logger(`[zimage] 从日志中提取图片路径: ${extractedPath}`);
+          logger(`[zimage] 从数组item[${i}]日志中提取图片路径: ${extractedPath}`);
           return await resolveImageResult(extractedPath, baseUrl);
+        }
+
+        // Try as URL, base64, or file path
+        try {
+          const result = await resolveImageResult(item, baseUrl);
+          if (result.startsWith("data:image/")) {
+            logger(`[zimage] 数组item[${i}]解析成功`);
+            return result;
+          }
+        } catch {
+          // try next item
         }
       }
 
       if (item && typeof item === "object") {
-        if (item.url) return await resolveImageResult(item.url, baseUrl);
-        if (item.path) return await resolveImageResult(item.path, baseUrl);
-        if (item.image) return await resolveImageResult(item.image, baseUrl);
-        if (item.data) return await resolveImageResult(item.data, baseUrl);
+        // Gradio FileData: { url, path, mime_type, meta, ... }
+        if (item.url) {
+          logger(`[zimage] 数组item[${i}]有url字段: ${item.url}`);
+          return await resolveImageResult(item.url, baseUrl);
+        }
+        if (item.path) {
+          logger(`[zimage] 数组item[${i}]有path字段: ${item.path}`);
+          return await resolveImageResult(item.path, baseUrl);
+        }
+        if (item.image) {
+          logger(`[zimage] 数组item[${i}]有image字段`);
+          return await resolveImageResult(item.image, baseUrl);
+        }
+        if (item.data) {
+          logger(`[zimage] 数组item[${i}]有data字段`);
+          return await resolveImageResult(item.data, baseUrl);
+        }
+        // Nested: item has string representation with path
+        const itemStr = JSON.stringify(item);
+        const extractedFromObj = extractImagePathFromText(itemStr);
+        if (extractedFromObj) {
+          logger(`[zimage] 从数组item[${i}]对象JSON中提取图片路径: ${extractedFromObj}`);
+          return await resolveImageResult(extractedFromObj, baseUrl);
+        }
       }
     }
 
-    // Second pass: try each item as-is (may be URL, base64, etc.)
+    // Second pass: try each remaining string item as base64/URL
     for (const item of raw) {
-      try {
-        return await resolveImageResult(item, baseUrl);
-      } catch {
-        // try next item
+      if (typeof item === "string") {
+        try {
+          const result = await resolveImageResult(item, baseUrl);
+          if (result.startsWith("data:image/")) return result;
+        } catch {
+          // try next
+        }
       }
     }
   }
@@ -301,24 +378,115 @@ const resolveImageResult = async (raw: any, baseUrl: string): Promise<string> =>
     if (raw.mime_type && typeof raw.data === "string") {
       return await resolveImageResult(raw.data, baseUrl);
     }
+    // Try extracting from object's string representation
+    const objStr = JSON.stringify(raw);
+    const extractedFromObj = extractImagePathFromText(objStr);
+    if (extractedFromObj) {
+      logger(`[zimage] 从对象JSON中提取图片路径: ${extractedFromObj}`);
+      return await resolveImageResult(extractedFromObj, baseUrl);
+    }
   }
 
   throw new Error(`[zimage] 无法解析图片结果，类型: ${typeof raw}, 值: ${JSON.stringify(raw).substring(0, 200)}`);
 };
 
-/** 解析 Gradio SSE 流，提取最终数据 */
+/** 解析 Gradio SSE 流，提取最终数据
+ *  Handles:
+ *  - Single-line data: "data: {json}"
+ *  - Multi-line data: multiple "data:" lines concatenated per SSE spec
+ *  - Fallback: try parsing entire text as JSON (for non-SSE responses)
+ */
 const parseGradioSSE = (sseText: string): any => {
   const lines = sseText.split("\n");
+  let currentEvent: string | null = null;
+  let dataBuffer: string[] = [];      // Buffer for multi-line data
   let lastData: any = null;
-  for (const line of lines) {
-    if (line.startsWith("data: ")) {
+  let lastCompleteData: any = null;
+
+  const flushDataBuffer = () => {
+    if (dataBuffer.length === 0) return;
+
+    // SSE spec: multiple data lines are joined by \n
+    const joinedData = dataBuffer.join("\n");
+    dataBuffer = [];
+
+    try {
+      const parsed = JSON.parse(joinedData);
+      logger(`[zimage] parseGradioSSE: parsed data for event=${currentEvent}, type=${Array.isArray(parsed) ? "array" : typeof parsed}`);
+
+      // If this data follows a 'complete' or 'process_completed' event, prioritize it
+      if (currentEvent === "complete" || currentEvent === "process_completed") {
+        lastCompleteData = parsed;
+      }
+
+      lastData = parsed;
+    } catch (e: any) {
+      logger(`[zimage] parseGradioSSE: JSON parse failed for data="${joinedData.substring(0, 200)}", error=${e.message}`);
+      // If it's an array-like string, try fixing common issues
       try {
-        lastData = JSON.parse(line.substring(6));
+        // Maybe the data is a single value, not JSON
+        if (joinedData.startsWith('"') && joinedData.endsWith('"')) {
+          const unquoted = JSON.parse(joinedData);
+          if (currentEvent === "complete" || currentEvent === "process_completed") {
+            lastCompleteData = unquoted;
+          }
+          lastData = unquoted;
+        }
       } catch {
-        // 忽略解析失败的行
+        // Give up on this data block
       }
     }
+  };
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    // Empty line = end of event block → flush data buffer
+    if (line.trim() === "") {
+      flushDataBuffer();
+      currentEvent = null;
+      continue;
+    }
+
+    // Track event type
+    if (line.startsWith("event:")) {
+      flushDataBuffer(); // Flush any previous data
+      currentEvent = line.substring(6).trim();
+      logger(`[zimage] parseGradioSSE: event=${currentEvent}`);
+      continue;
+    }
+
+    // Accumulate data lines (SSE spec: multiple data lines are joined by \n)
+    if (line.startsWith("data:")) {
+      const dataContent = line.substring(5).startsWith(" ") ? line.substring(6) : line.substring(5);
+      dataBuffer.push(dataContent);
+      continue;
+    }
+
+    // Other lines (comments, etc.) — ignore
   }
+
+  // Flush any remaining data
+  flushDataBuffer();
+
+  // Prefer data from complete event
+  if (lastCompleteData !== null) {
+    logger(`[zimage] parseGradioSSE: returning lastCompleteData (type=${Array.isArray(lastCompleteData) ? "array" : typeof lastCompleteData})`);
+    return lastCompleteData;
+  }
+
+  // Fallback: try parsing the entire text as JSON (for non-SSE responses)
+  if (lastData === null) {
+    try {
+      const directParsed = JSON.parse(sseText);
+      logger(`[zimage] parseGradioSSE: fallback direct JSON parse succeeded (type=${Array.isArray(directParsed) ? "array" : typeof directParsed})`);
+      return directParsed;
+    } catch {
+      // Not JSON either
+    }
+  }
+
+  logger(`[zimage] parseGradioSSE: returning lastData=${lastData !== null ? "present" : "null"}`);
   return lastData;
 };
 
@@ -369,23 +537,6 @@ const imageRequest = async (config: ImageConfig, _model: ImageModel): Promise<st
 
   const prompt = config.prompt;
 
-  // w and h MUST be number type, not string
-  const params = {
-    p: prompt,
-    w: Number(width),
-    h: Number(height),
-    st: Number(steps),
-    sd: Number(seed),
-    cfg: Number(cfg),
-    vae: vaePath,
-    llm: llmPath,
-    l_list: loras ? loras.split(",").map((s: string) => s.trim()) : [],
-    l_str: Number(loraStrength),
-  };
-
-  logger(`[zimage] request params: w=${params.w}(${typeof params.w}), h=${params.h}(${typeof params.h}), st=${params.st}, sd=${params.sd}, cfg=${params.cfg}`);
-  logger(`[zimage] 开始生图 → prompt="${prompt.substring(0, 60)}..."`);
-
   // ===== 尝试1: Gradio v2 API (flat named payload) =====
   try {
     const gradioNamedPayload = {
@@ -397,7 +548,7 @@ const imageRequest = async (config: ImageConfig, _model: ImageModel): Promise<st
       cfg: Number(cfg),
       vae: vaePath,
       llm: llmPath,
-      l_list: Array.isArray(loras) ? loras : [],
+      l_list: loras ? loras.split(",").map((s: string) => s.trim()) : [],
       l_str: Number(loraStrength),
     };
     const v2Endpoint = `${baseUrl}/gradio_api/call/v2/${apiName}`;
@@ -436,7 +587,7 @@ const imageRequest = async (config: ImageConfig, _model: ImageModel): Promise<st
 
   // ===== 尝试2: Gradio v1 API (fallback) =====
   try {
-    const v1Payload = { data: params };
+    const v1Payload = { data: [prompt, Number(width), Number(height), Number(steps), Number(seed), Number(cfg)] };
     const v1Endpoint = `${baseUrl}/gradio_api/call/${apiName}`;
 
     logger(`[zimage] submit endpoint used: POST ${v1Endpoint} (fallback)`);
@@ -520,7 +671,7 @@ const imageRequest = async (config: ImageConfig, _model: ImageModel): Promise<st
   throw new Error("[zimage] 所有端点均失败：v2 API、v1 API、/generate、/v1/images/generations");
 };
 
-/** Poll Gradio SSE result with named parameter format */
+/** Poll Gradio SSE result with robust completion detection */
 const pollGradioResult = async (baseUrl: string, apiPath: string, eventId: string): Promise<string | null> => {
   const pollUrl = `${baseUrl}${apiPath}/${eventId}`;
   logger(`[zimage] 开始轮询: GET ${pollUrl}`);
@@ -539,6 +690,14 @@ const pollGradioResult = async (baseUrl: string, apiPath: string, eventId: strin
 
       // ===== SSE 文本格式 =====
       if (typeof resultData === "string") {
+        // Step 1: Direct extraction from raw SSE text before parsing
+        const directExtractedPath = extractImagePathFromText(resultData);
+        if (directExtractedPath) {
+          logger(`[zimage] 从SSE原始文本中提取图片路径: ${directExtractedPath}`);
+          return { completed: true, data: JSON.stringify(directExtractedPath) };
+        }
+
+        // Step 2: Parse SSE structured events
         const parsed = parseGradioSSE(resultData);
 
         if (parsed) {
@@ -549,13 +708,21 @@ const pollGradioResult = async (baseUrl: string, apiPath: string, eventId: strin
             return { completed: false };
           }
 
+          // Gradio v2 complete may send array of log strings directly
+          // MUST check Array.isArray BEFORE msg checks (arrays don't have .msg)
+          if (Array.isArray(parsed)) {
+            logger(`[zimage] pollGradioResult: parsed is array (length=${parsed.length}), marking completed`);
+            return { completed: true, data: JSON.stringify(parsed) };
+          }
+
           // 生成完成
           if (msg === "process_completed" || msg === "complete") {
             const output = parsed.output?.data || parsed.data;
             if (output) {
               return { completed: true, data: JSON.stringify(output) };
             }
-            return { completed: false };
+            // msg says complete but no data — still mark complete, let resolveImageResult handle it
+            return { completed: true, data: JSON.stringify(parsed) };
           }
 
           // 有 output.data 或 data 字段 → 视为最终结果
@@ -566,20 +733,46 @@ const pollGradioResult = async (baseUrl: string, apiPath: string, eventId: strin
             return { completed: true, data: JSON.stringify(parsed.data) };
           }
 
-          // Gradio v2 complete may send array of log strings directly
-          if (Array.isArray(parsed)) {
-            return { completed: true, data: JSON.stringify(parsed) };
-          }
-
           // 无法判断 → 继续轮询
           return { completed: false };
+        }
+
+        // Step 3: SSE contains 'save result image' but couldn't parse JSON → still extract path
+        if (resultData.includes("save result image")) {
+          const ssePath = extractImagePathFromText(resultData);
+          if (ssePath) {
+            logger(`[zimage] 从SSE未解析文本中提取图片路径: ${ssePath}`);
+            return { completed: true, data: JSON.stringify(ssePath) };
+          }
+          // Has "save result image" but couldn't extract path — still mark completed
+          // The resolveImageResult will try to handle the raw text
+          logger(`[zimage] SSE包含"save result image"但无法提取路径，标记completed让resolve处理`);
+          return { completed: true, data: JSON.stringify(resultData) };
         }
 
         // SSE 文本无法解析 → 继续轮询
         return { completed: false };
       }
 
-      // ===== JSON 格式响应 =====
+      // ===== JSON 格式响应 (axios auto-parsed) =====
+
+      // Array response (Gradio v2 may return array of log strings directly)
+      if (Array.isArray(resultData)) {
+        logger(`[zimage] pollGradioResult: resultData is array (length=${resultData.length}), marking completed`);
+        // Check if any item contains "save result image" path
+        for (const item of resultData) {
+          if (typeof item === "string") {
+            const extractedPath = extractImagePathFromText(item);
+            if (extractedPath) {
+              logger(`[zimage] 从数组响应item中提取图片路径: ${extractedPath}`);
+              return { completed: true, data: JSON.stringify(extractedPath) };
+            }
+          }
+        }
+        return { completed: true, data: JSON.stringify(resultData) };
+      }
+
+      // Object response with msg field
       if (resultData?.msg === "process_completed" || resultData?.msg === "complete") {
         const output = resultData?.output?.data || resultData?.data;
         if (output) {
@@ -596,6 +789,19 @@ const pollGradioResult = async (baseUrl: string, apiPath: string, eventId: strin
         return { completed: true, data: JSON.stringify(resultData.data) };
       }
 
+      // Object contains "save result image" in stringified form
+      const resultStr = JSON.stringify(resultData);
+      if (resultStr.includes("save result image")) {
+        const extractedPath = extractImagePathFromText(resultStr);
+        if (extractedPath) {
+          logger(`[zimage] 从对象响应JSON中提取图片路径: ${extractedPath}`);
+          return { completed: true, data: JSON.stringify(extractedPath) };
+        }
+        // Has the pattern but couldn't extract — return raw for resolveImageResult
+        logger(`[zimage] 对象响应包含"save result image"但无法提取路径，标记completed让resolve处理`);
+        return { completed: true, data: JSON.stringify(resultData) };
+      }
+
       // 其他未知响应 → 继续轮询
       return { completed: false };
     } catch (e: any) {
@@ -609,7 +815,8 @@ const pollGradioResult = async (baseUrl: string, apiPath: string, eventId: strin
   }
 
   const rawResult = JSON.parse(pollResult.data!);
-  logger(`[zimage] result image path/url: ${JSON.stringify(rawResult).substring(0, 200)}`);
+  logger(`[zimage] result raw data type: ${Array.isArray(rawResult) ? "array" : typeof rawResult}`);
+  logger(`[zimage] result preview: ${JSON.stringify(rawResult).substring(0, 300)}`);
   logger(`[zimage] 轮询完成，解析图片结果`);
   const imageBase64 = await resolveImageResult(rawResult, baseUrl);
 
@@ -630,7 +837,7 @@ const ttsRequest = async (_config: TTSConfig, _model: TTSModel): Promise<string>
 };
 
 const checkForUpdates = async (): Promise<{ hasUpdate: boolean; latestVersion: string; notice: string }> => {
-  return { hasUpdate: false, latestVersion: "2.1", notice: "" };
+  return { hasUpdate: false, latestVersion: "2.2", notice: "" };
 };
 
 const updateVendor = async (): Promise<string> => {
