@@ -175,6 +175,25 @@ const vendor: VendorConfig = {
 // 辅助函数
 // ============================================================
 
+/** Extract image file path from log text strings */
+const extractImagePathFromText = (text: string): string | null => {
+  if (!text) return null;
+
+  const patterns = [
+    /save result image \d+ to '([^']+\.(?:png|jpg|jpeg|webp))'/i,
+    /save result image \d+ to "([^"]+\.(?:png|jpg|jpeg|webp))"/i,
+    /([A-Za-z]:[\/\\][^\r\n"'<>]+?\.(?:png|jpg|jpeg|webp))/i,
+    /(\/[^\r\n"'<>]+?\.(?:png|jpg|jpeg|webp))/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (match?.[1]) return match[1];
+  }
+
+  return null;
+};
+
 /** 解析图片结果，统一返回 data:image/xxx;base64,... 格式 */
 const resolveImageResult = async (raw: any, baseUrl: string): Promise<string> => {
   // 1) 字符串类型
@@ -229,31 +248,35 @@ const resolveImageResult = async (raw: any, baseUrl: string): Promise<string> =>
     return `data:image/png;base64,${s}`;
   }
 
-  // 2) 数组类型（Gradio 可能返回 [url] 或 [FileData] 或 [image]）
+  // 2) 数组类型（Gradio 可能返回 [url] 或 [FileData] 或 [log strings]）
   if (Array.isArray(raw)) {
     logger(`[zimage] 结果类型: 数组 (长度=${raw.length})`);
-    if (raw.length > 0) {
-      const first = raw[0];
-      // Gradio FileData object: { path, url, mime_type, meta, ... }
-      if (first && typeof first === "object") {
-        // Try url first (Gradio v4+)
-        if (first.url) {
-          return await resolveImageResult(first.url, baseUrl);
-        }
-        // Try path with Gradio file serving
-        if (first.path) {
-          return await resolveImageResult(first.path, baseUrl);
-        }
-        // Try image field
-        if (first.image) {
-          return await resolveImageResult(first.image, baseUrl);
-        }
-        // Try mime_type + data
-        if (first.mime_type && first.data) {
-          return await resolveImageResult(first.data, baseUrl);
+
+    // First pass: look for FileData objects or extract path from log strings
+    for (const item of raw) {
+      if (typeof item === "string") {
+        const extractedPath = extractImagePathFromText(item);
+        if (extractedPath) {
+          logger(`[zimage] 从日志中提取图片路径: ${extractedPath}`);
+          return await resolveImageResult(extractedPath, baseUrl);
         }
       }
-      return await resolveImageResult(first, baseUrl);
+
+      if (item && typeof item === "object") {
+        if (item.url) return await resolveImageResult(item.url, baseUrl);
+        if (item.path) return await resolveImageResult(item.path, baseUrl);
+        if (item.image) return await resolveImageResult(item.image, baseUrl);
+        if (item.data) return await resolveImageResult(item.data, baseUrl);
+      }
+    }
+
+    // Second pass: try each item as-is (may be URL, base64, etc.)
+    for (const item of raw) {
+      try {
+        return await resolveImageResult(item, baseUrl);
+      } catch {
+        // try next item
+      }
     }
   }
 
@@ -541,6 +564,11 @@ const pollGradioResult = async (baseUrl: string, apiPath: string, eventId: strin
           }
           if (parsed.data) {
             return { completed: true, data: JSON.stringify(parsed.data) };
+          }
+
+          // Gradio v2 complete may send array of log strings directly
+          if (Array.isArray(parsed)) {
+            return { completed: true, data: JSON.stringify(parsed) };
           }
 
           // 无法判断 → 继续轮询
