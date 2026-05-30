@@ -114,6 +114,7 @@ interface TTSConfig {
 declare const axios: any;
 declare const logger: (msg: string) => void;
 declare const urlToBase64: (url: string) => Promise<string>;
+declare const require: any;
 declare const pollTask: (fn: () => Promise<{ completed: boolean; data?: string; error?: string }>, interval?: number, timeout?: number) => Promise<{ completed: boolean; data?: string; error?: string }>;
 declare const exports: {
   vendor: VendorConfig;
@@ -226,6 +227,55 @@ const extractImagePathFromText = (text: string): string | null => {
   return null;
 };
 
+
+
+/** Convert local Z-Image outputs path to static HTTP URL.
+ * Requires running:
+ *   cd D:\Z-Image-Turbo-Windows\outputs
+ *   python -m http.server 9010 --bind 127.0.0.1
+ */
+const convertLocalOutputPathToHttpUrl = (filePath: string): string | null => {
+  if (!filePath) return null;
+
+  const normalized = filePath.replace(/\\/g, "/");
+  const marker = "/outputs/";
+  const idx = normalized.toLowerCase().lastIndexOf(marker);
+
+  if (idx === -1) return null;
+
+  const fileName = normalized.substring(idx + marker.length);
+  if (!fileName) return null;
+
+  return `http://127.0.0.1:9010/${encodeURIComponent(fileName)}`;
+};
+
+/** Try Gradio file-serving endpoints for local generated image paths. */
+const tryGradioFileUrls = async (filePath: string, baseUrl: string): Promise<string> => {
+  const root = baseUrl.replace(/\/+$/, "");
+  const normalized = filePath.replace(/\\/g, "/");
+
+  const candidates = [
+    `${root}/gradio_api/file=${encodeURIComponent(filePath)}`,
+    `${root}/file=${encodeURIComponent(filePath)}`,
+    `${root}/gradio_api/file=${encodeURIComponent(normalized)}`,
+    `${root}/file=${encodeURIComponent(normalized)}`,
+  ];
+
+  let lastError: any = null;
+
+  for (const url of candidates) {
+    try {
+      logger(`[zimage] 尝试 Gradio encoded file URL → ${url.substring(0, 200)}`);
+      return await urlToBase64(url);
+    } catch (e: any) {
+      lastError = e;
+      logger(`[zimage] Gradio file URL 失败: ${e?.message || e}`);
+    }
+  }
+
+  throw lastError || new Error(`[zimage] 所有 Gradio file URL 均失败: ${filePath}`);
+};
+
 /** 解析图片结果，统一返回 data:image/xxx;base64,... 格式 */
 const resolveImageResult = async (raw: any, baseUrl: string): Promise<string> => {
   // 1) 字符串类型
@@ -260,19 +310,35 @@ const resolveImageResult = async (raw: any, baseUrl: string): Promise<string> =>
     // Local file path (Windows or Linux absolute path)
     if (/^[A-Za-z]:[\\\/]/.test(s) || s.startsWith("/home/") || s.startsWith("/tmp/") || s.startsWith("/data/")) {
       logger(`[zimage] 结果类型: 本地文件路径 → ${s}`);
+
+      // Prefer static output HTTP server for Z-Image outputs folder.
+      const outputHttpUrl = convertLocalOutputPathToHttpUrl(s);
+      if (outputHttpUrl) {
+        logger(`[zimage] 本地输出路径转换为HTTP URL → ${outputHttpUrl}`);
+        return await urlToBase64(outputHttpUrl);
+      }
+
+      // Toonflow vendor VM may not expose require("fs"), so prefer Gradio file-serving URLs.
       try {
-        const fs = require("fs");
-        const fileBuffer = fs.readFileSync(s);
-        const b64 = fileBuffer.toString("base64");
-        logger(`[zimage] 本地文件读取成功, 大小=${fileBuffer.length}`);
-        return `data:image/png;base64,${b64}`;
+        return await tryGradioFileUrls(s, baseUrl);
+      } catch (fileUrlErr: any) {
+        logger(`[zimage] Gradio file URL 全部失败: ${fileUrlErr?.message || fileUrlErr}`);
+      }
+
+      // Optional local fs fallback only if require is available.
+      try {
+        if (typeof require !== "undefined") {
+          const fs = require("fs");
+          const fileBuffer = fs.readFileSync(s);
+          const b64 = fileBuffer.toString("base64");
+          logger(`[zimage] 本地文件读取成功, 大小=${fileBuffer.length}`);
+          return `data:image/png;base64,${b64}`;
+        }
       } catch (readErr: any) {
         logger(`[zimage] 本地文件读取失败: ${readErr.message}`);
-        // Fallback: try as Gradio file path
-        const fileUrl = `${baseUrl.replace(/\/+$/, "")}/file=${s}`;
-        logger(`[zimage] 尝试 Gradio file URL → ${fileUrl.substring(0, 80)}`);
-        return await urlToBase64(fileUrl);
       }
+
+      throw new Error(`[zimage] 无法读取本地图片文件: ${s}`);
     }
 
     // Extract image path from log text (e.g. "save result image 0 to 'D:\\...\\out.png'")
@@ -548,12 +614,13 @@ const imageRequest = async (config: ImageConfig, _model: ImageModel): Promise<st
       cfg: Number(cfg),
       vae: vaePath,
       llm: llmPath,
-      l_list: loras ? loras.split(",").map((s: string) => s.trim()) : [],
+      l_list: loras ? loras.split(",").map((s: string) => s.trim()).filter(Boolean) : [],
       l_str: Number(loraStrength),
     };
     const v2Endpoint = `${baseUrl}/gradio_api/call/v2/${apiName}`;
 
     logger(`[zimage] submit endpoint used: POST ${v2Endpoint}`);
+    logger(`[zimage] v2 payload keys: ${Object.keys(gradioNamedPayload).join(",")}`);
     logger(`[zimage] v2 payload preview: ${JSON.stringify(gradioNamedPayload).slice(0, 500)}`);
     const submitResp = await axios.post(v2Endpoint, gradioNamedPayload, {
       headers: { "Content-Type": "application/json" },
@@ -582,15 +649,29 @@ const imageRequest = async (config: ImageConfig, _model: ImageModel): Promise<st
   } catch (e: any) {
     logger(`[zimage] v2 API 失败: ${e.message}`);
     logger(`[zimage] v2 error status: ${e.response?.status}`);
-    logger(`[zimage] v2 error data: ${JSON.stringify(e.response?.data).slice(0, 1000)}`);
+    logger(`[zimage] v2 error data: ${String(JSON.stringify(e.response?.data ?? "")).slice(0, 1000)}`);
   }
 
   // ===== 尝试2: Gradio v1 API (fallback) =====
   try {
-    const v1Payload = { data: [prompt, Number(width), Number(height), Number(steps), Number(seed), Number(cfg)] };
+    const v1Payload = {
+      data: [
+        prompt,
+        Number(width),
+        Number(height),
+        Number(steps),
+        Number(seed),
+        Number(cfg),
+        vaePath,
+        llmPath,
+        loras ? loras.split(",").map((s: string) => s.trim()).filter(Boolean) : [],
+        Number(loraStrength),
+      ],
+    };
     const v1Endpoint = `${baseUrl}/gradio_api/call/${apiName}`;
 
     logger(`[zimage] submit endpoint used: POST ${v1Endpoint} (fallback)`);
+    logger(`[zimage] v1 payload count: ${v1Payload.data.length}`);
     const submitResp = await axios.post(v1Endpoint, v1Payload, {
       headers: { "Content-Type": "application/json" },
       timeout: 300000,
