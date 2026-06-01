@@ -27,17 +27,17 @@ export interface AgentContext {
 function buildMemPrompt(mem: Awaited<ReturnType<Memory["get"]>>): string {
   let memoryContext = "";
   if (mem.rag.length) {
-    memoryContext += `[相关记忆]\n${mem.rag.map((r) => r.content).join("\n")}`;
+    memoryContext += `[Memori Terkait]\n${mem.rag.map((r) => r.content).join("\n")}`;
   }
   if (mem.summaries.length) {
     if (memoryContext) memoryContext += "\n\n";
-    memoryContext += `[历史摘要]\n${mem.summaries.map((s, i) => `${i + 1}. ${s.content}`).join("\n")}`;
+    memoryContext += `[Ringkasan Historis]\n${mem.summaries.map((s, i) => `${i + 1}. ${s.content}`).join("\n")}`;
   }
   if (mem.shortTerm.length) {
     if (memoryContext) memoryContext += "\n\n";
-    memoryContext += `[近期对话]\n${mem.shortTerm.map((m) => `${m.role}: ${m.content}`).join("\n")}`;
+    memoryContext += `[Dialog Terkini]\n${mem.shortTerm.map((m) => `${m.role}: ${m.content}`).join("\n")}`;
   }
-  return `## Memory\n以下是你对用户的记忆，可作为参考但不要主动提及：\n${memoryContext}`;
+  return `## Memori\nBerikut adalah memori Anda tentang pengguna, dapat dijadikan referensi tetapi jangan disebutkan secara aktif:\n${memoryContext}`;
 }
 
 export async function runDecisionAI(ctx: AgentContext) {
@@ -49,11 +49,11 @@ export async function runDecisionAI(ctx: AgentContext) {
   const prompt = await fs.promises.readFile(skill, "utf-8");
 
   const projectInfo = await u.db("o_project").where("id", ctx.resTool.data.projectId).first();
-  if (!projectInfo) throw new Error(`项目不存在，ID: ${ctx.resTool.data.projectId}`);
+  if (!projectInfo) throw new Error(`Proyek tidak ditemukan, ID: ${ctx.resTool.data.projectId}`);
   const [_, imageModelName] = projectInfo.imageModel!.split(/:(.+)/);
   const [id, videoModelName] = projectInfo.videoModel!.split(/:(.+)/);
   const models = await u.vendor.getModelList(id);
-  if (!models.length) throw new Error(`项目使用的模型不存在，ID: ${projectInfo.videoModel}`);
+  if (!models.length) throw new Error(`Model yang digunakan proyek tidak ditemukan, ID: ${projectInfo.videoModel}`);
   let videoMode = "";
   try {
     videoMode = JSON.parse(projectInfo.mode ?? "");
@@ -64,7 +64,7 @@ export async function runDecisionAI(ctx: AgentContext) {
   // const findData = models.find((i: any) => i.modelName == videoModelName);
   // const isRef = findData.mode.every((i: any) => Array.isArray(i));
 
-  const modelInfo = `项目使用的模型如下：\n图像模型：${imageModelName}\n视频模型：${videoModelName}\n多参：${isRef ? "是" : "否"}`;
+  const modelInfo = `Model yang digunakan proyek:\nModel gambar: ${imageModelName}\nModel video: ${videoModelName}\nMulti-referensi: ${isRef ? "Ya" : "Tidak"}`;
 
   const mem = buildMemPrompt(await memory.get(text));
 
@@ -133,24 +133,24 @@ async function createSubAgent(parentCtx: AgentContext) {
       });
     }
 
-    parentCtx.msg = resTool.newMessage("assistant", "视频策划");
+    parentCtx.msg = resTool.newMessage("assistant", "Perencana Video");
     return fullResponse;
   }
 
   const promptInput = z
     .object({
-      prompt: z.string().describe("交给子Agent的任务简约描述，100字以内"),
+      prompt: z.string().describe("Deskripsi singkat tugas untuk subAgent, maksimal 100 karakter"),
     })
     .toJSONSchema();
 
   const projectInfo = await u.db("o_project").where("id", resTool.data.projectId).first();
-  if (!projectInfo) throw new Error(`项目不存在，ID: ${resTool.data.projectId}`);
+  if (!projectInfo) throw new Error(`Proyek tidak ditemukan, ID: ${resTool.data.projectId}`);
   const artSkills = await createArtSkills(projectInfo?.artStyle!, projectInfo?.directorManual!);
 
   const [_, imageModelName] = projectInfo.imageModel!.split(/:(.+)/);
   const [id, videoModelName] = projectInfo.videoModel!.split(/:(.+)/);
   const models = await u.vendor.getModelList(id);
-  if (!models.length) throw new Error(`项目使用的模型不存在，ID: ${projectInfo.videoModel}`);
+  if (!models.length) throw new Error(`Model yang digunakan proyek tidak ditemukan, ID: ${projectInfo.videoModel}`);
   // const findData = models.find((i: any) => i.modelName == videoModelName);
   //
   let videoMode = "";
@@ -161,7 +161,7 @@ async function createSubAgent(parentCtx: AgentContext) {
   }
   const isRef = Array.isArray(videoMode) ? true : false;
 
-  const modelInfo = `项目使用的模型如下：\n图像模型：${imageModelName}\n视频模型：${videoModelName}\n多参：${isRef ? "是" : "否"}`;
+  const modelInfo = `Model yang digunakan proyek:\nModel gambar: ${imageModelName}\nModel video: ${videoModelName}\nMulti-referensi: ${isRef ? "Ya" : "Tidak"}`;
 
   // const run_sub_agent_execution = tool({
   //   description: "执行层子Agent，负责衍生资产、",
@@ -172,7 +172,7 @@ async function createSubAgent(parentCtx: AgentContext) {
   //     const addPrompt =
   //       "\n" +
   //       [
-  //         "你必须使用如下XML格式写入工作区：\n```",
+  //         "Anda harus menggunakan format XML berikut untuk menulis ke ruang kerja:\n```",
   //         "拍摄计划：<scriptPlan>内容</scriptPlan>",
   //         "分镜表：<storyboardTable>内容</storyboardTable>",
   //         "分镜面板：<storyboardItem videoDesc='视频描述' prompt=提示词内容 track='分组' duration='视频推荐时间' associateAssetsIds='[该分镜所需的资产ID列表]'></storyboardItem>",
@@ -182,7 +182,7 @@ async function createSubAgent(parentCtx: AgentContext) {
   //     return runAgent({
   //       prompt,
   //       system: systemPrompt + addPrompt,
-  //       name: "执行导演",
+  //       name: "Sutradara Eksekusi",
   //       memoryKey: "assistant:execution",
   //       messages: [
   //         { role: "assistant", content: artSkills.prompt + `\n${modelInfo}` },
@@ -195,7 +195,7 @@ async function createSubAgent(parentCtx: AgentContext) {
 
   //衍生资产分析与信息写入
   const run_sub_agent_derive_assets = tool({
-    description: "运行执行subAgent来完成衍生资产分析与信息写入相关任务",
+    description: "Menjalankan subAgent eksekusi untuk menyelesaikan tugas terkait analisis aset turunan dan penulisan informasi",
     inputSchema: jsonSchema<{ prompt: string }>(promptInput),
     execute: async ({ prompt }) => {
       const skill = path.join(u.getPath("skills"), "production_execution_derive_assets.md");
@@ -204,7 +204,7 @@ async function createSubAgent(parentCtx: AgentContext) {
         key: "productionAgent:deriveAssetsAgent",
         prompt,
         system: systemPrompt,
-        name: "执行导演",
+        name: "Sutradara Eksekusi",
         memoryKey: "assistant:execution",
         messages: [
           { role: "assistant", content: artSkills.prompt + `\n${modelInfo}` },
@@ -217,7 +217,7 @@ async function createSubAgent(parentCtx: AgentContext) {
 
   //衍生资产图片生成
   const run_sub_agent_generate_assets = tool({
-    description: "运行执行subAgent来完成衍生资产图片生成相关任务",
+    description: "Menjalankan subAgent eksekusi untuk menyelesaikan tugas terkait pembuatan gambar aset turunan",
     inputSchema: jsonSchema<{ prompt: string }>(promptInput),
     execute: async ({ prompt }) => {
       const skill = path.join(u.getPath("skills"), "production_execution_generate_assets.md");
@@ -226,7 +226,7 @@ async function createSubAgent(parentCtx: AgentContext) {
         key: "productionAgent:generateAssetsAgent",
         prompt,
         system: systemPrompt,
-        name: "执行导演",
+        name: "Sutradara Eksekusi",
         memoryKey: "assistant:execution",
         messages: [
           { role: "assistant", content: artSkills.prompt + `\n${modelInfo}` },
@@ -239,19 +239,19 @@ async function createSubAgent(parentCtx: AgentContext) {
 
   //拍摄计划
   const run_sub_agent_director_plan = tool({
-    description: "运行执行subAgent来完成导演规划相关任务",
+    description: "Menjalankan subAgent eksekusi untuk menyelesaikan tugas terkait perencanaan sutradara",
     inputSchema: jsonSchema<{ prompt: string }>(promptInput),
     execute: async ({ prompt }) => {
       const skill = path.join(u.getPath("skills"), "production_execution_director_plan.md");
       const systemPrompt = await fs.promises.readFile(skill, "utf-8");
 
-      const addPrompt = "\n你必须使用如下XML格式写入工作区：\n```\n<scriptPlan>内容</scriptPlan>\n```";
+      const addPrompt = "\nAnda harus menggunakan format XML berikut untuk menulis ke ruang kerja:\n```\n<scriptPlan>内容</scriptPlan>\n```";
 
       return runAgent({
         key: "productionAgent:directorPlanAgent",
         prompt,
         system: systemPrompt + addPrompt,
-        name: "执行导演",
+        name: "Sutradara Eksekusi",
         memoryKey: "assistant:execution",
         messages: [
           { role: "assistant", content: artSkills.prompt + `\n${modelInfo}` },
@@ -264,7 +264,7 @@ async function createSubAgent(parentCtx: AgentContext) {
 
   //分镜图生成
   const run_sub_agent_storyboard_gen = tool({
-    description: "运行执行subAgent来完成分镜图生成相关任务",
+    description: "Menjalankan subAgent eksekusi untuk menyelesaikan tugas terkait pembuatan gambar storyboard",
     inputSchema: jsonSchema<{ prompt: string }>(promptInput),
     execute: async ({ prompt }) => {
       const skill = path.join(u.getPath("skills"), "production_execution_storyboard_gen.md");
@@ -273,7 +273,7 @@ async function createSubAgent(parentCtx: AgentContext) {
         key: "productionAgent:storyboardGenAgent",
         prompt,
         system: systemPrompt,
-        name: "执行导演",
+        name: "Sutradara Eksekusi",
         memoryKey: "assistant:execution",
         messages: [
           { role: "assistant", content: artSkills.prompt + `\n${modelInfo}` },
@@ -298,20 +298,20 @@ async function createSubAgent(parentCtx: AgentContext) {
 
   //分镜面板写入
   const run_sub_agent_storyboard_panel = tool({
-    description: "运行执行subAgent来完成分镜面板写入相关任务",
+    description: "Menjalankan subAgent eksekusi untuk menyelesaikan tugas terkait penulisan panel storyboard",
     inputSchema: jsonSchema<{ prompt: string }>(promptInput),
     execute: async ({ prompt }) => {
       const skill = path.join(u.getPath("skills"), "production_execution_storyboard_panel.md");
       const systemPrompt = await fs.promises.readFile(skill, "utf-8");
 
       const addPrompt =
-        "\n你必须使用如下XML格式写入工作区：\n```\n<storyboardItem videoDesc='视频描述' prompt=提示词内容 track='分组' shouldGenerateImage='true/false' duration='视频推荐时间' associateAssetsIds='[该分镜所需的资产ID列表]'></storyboardItem>\n```";
+        "\nAnda harus menggunakan format XML berikut untuk menulis ke ruang kerja:\n```\n<storyboardItem videoDesc='视频描述' prompt=提示词内容 track='分组' shouldGenerateImage='true/false' duration='视频推荐时间' associateAssetsIds='[该分镜所需的资产ID列表]'></storyboardItem>\n```";
 
       return runAgent({
         key: "productionAgent:storyboardPanelAgent",
         prompt,
         system: systemPrompt + addPrompt,
-        name: "执行导演",
+        name: "Sutradara Eksekusi",
         memoryKey: "assistant:execution",
         messages: [
           { role: "assistant", content: productionSkills.prompt + `\n${modelInfo}` },
@@ -324,19 +324,19 @@ async function createSubAgent(parentCtx: AgentContext) {
 
   //分镜表写入
   const run_sub_agent_storyboard_table = tool({
-    description: "运行执行subAgent来完成分镜表构建相关任务",
+    description: "Menjalankan subAgent eksekusi untuk menyelesaikan tugas terkait pembuatan tabel storyboard",
     inputSchema: jsonSchema<{ prompt: string }>(promptInput),
     execute: async ({ prompt }) => {
       const skill = path.join(u.getPath("skills"), "production_execution_storyboard_table.md");
       const systemPrompt = await fs.promises.readFile(skill, "utf-8");
 
-      const addPrompt = "\n你必须使用如下XML格式写入工作区：\n```\n<storyboardTable>内容</storyboardTable>\n```";
+      const addPrompt = "\nAnda harus menggunakan format XML berikut untuk menulis ke ruang kerja:\n```\n<storyboardTable>内容</storyboardTable>\n```";
 
       return runAgent({
         key: "productionAgent:storyboardTableAgent",
         prompt,
         system: systemPrompt + addPrompt,
-        name: "执行导演",
+        name: "Sutradara Eksekusi",
         memoryKey: "assistant:execution",
         messages: [
           { role: "assistant", content: productionSkills.prompt + `\n${modelInfo}` },
@@ -348,7 +348,7 @@ async function createSubAgent(parentCtx: AgentContext) {
   });
 
   const run_sub_agent_supervision = tool({
-    description: "运行监督层subAgent执行独立任务，完成后返回结果",
+    description: "Menjalankan subAgent pengawas untuk mengeksekusi tugas independen, mengembalikan hasil setelah selesai",
     inputSchema: jsonSchema<{ prompt: string }>(promptInput),
     execute: async ({ prompt }) => {
       const skill = path.join(u.getPath("skills"), "production_agent_supervision.md");
@@ -357,7 +357,7 @@ async function createSubAgent(parentCtx: AgentContext) {
         key: "productionAgent:supervisionAgent",
         prompt,
         system: systemPrompt,
-        name: "监制",
+        name: "Pengawas",
         memoryKey: "assistant:supervision",
       });
     },
@@ -387,8 +387,8 @@ async function createArtSkills(artName: string, storyName: string) {
   }
   const res = {
     prompt: `## Skills
-以下技能提供了专业任务的专用指令。
-当任务与某个技能的描述匹配时，调用 activate_skill 工具并传入技能名称来加载完整指令。
+Skill berikut menyediakan instruksi khusus untuk tugas profesional.
+Ketika tugas cocok dengan deskripsi suatu skill, panggil alat activate_skill dan masukkan nama skill untuk memuat instruksi lengkap.
 ${buildSkillPrompt(mainSkills)}`,
     tools: createSkillTools(mainSkills, { mainSkill: mainSkills, secondarySkills: [], tertiarySkills: [] }),
   };
@@ -417,12 +417,12 @@ async function consumeFullStream(
       }
       if (chunk.type === "reasoning-start") {
         thinkTime = Date.now();
-        thinking = msg.thinking("思考中...");
+        thinking = msg.thinking("Berpikir...");
       } else if (chunk.type === "reasoning-delta") {
         thinking?.append(chunk.text);
       } else if (chunk.type === "reasoning-end") {
         thinkTime = Date.now() - thinkTime;
-        thinking?.updateTitle(`思考完毕（${(thinkTime / 1000).toFixed(1)} 秒）`);
+        thinking?.updateTitle(`Pemikiran selesai（${(thinkTime / 1000).toFixed(1)} detik）`);
         thinking?.complete();
         thinking = null;
       } else if (chunk.type === "text-delta") {
@@ -480,8 +480,8 @@ async function useProductionSkills(artName: string, storyName: string) {
   }
   const res = {
     prompt: `## Skills
-以下技能提供了专业任务的专用指令。
-当任务与某个技能的描述匹配时，调用 activate_skill 工具并传入技能名称来加载完整指令。
+Skill berikut menyediakan instruksi khusus untuk tugas profesional.
+Ketika tugas cocok dengan deskripsi suatu skill, panggil alat activate_skill dan masukkan nama skill untuk memuat instruksi lengkap.
 ${buildSkillPrompt(mainSkills)}`,
     tools: createSkillTools(mainSkills, { mainSkill: mainSkills, secondarySkills: [], tertiarySkills: [] }),
   };

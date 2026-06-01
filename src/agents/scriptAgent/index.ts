@@ -25,17 +25,17 @@ export interface AgentContext {
 function buildMemPrompt(mem: Awaited<ReturnType<Memory["get"]>>): string {
   let memoryContext = "";
   if (mem.rag.length) {
-    memoryContext += `[相关记忆]\n${mem.rag.map((r) => r.content).join("\n")}`;
+    memoryContext += `[Memori Terkait]\n${mem.rag.map((r) => r.content).join("\n")}`;
   }
   if (mem.summaries.length) {
     if (memoryContext) memoryContext += "\n\n";
-    memoryContext += `[历史摘要]\n${mem.summaries.map((s, i) => `${i + 1}. ${s.content}`).join("\n")}`;
+    memoryContext += `[Ringkasan Historis]\n${mem.summaries.map((s, i) => `${i + 1}. ${s.content}`).join("\n")}`;
   }
   if (mem.shortTerm.length) {
     if (memoryContext) memoryContext += "\n\n";
-    memoryContext += `[近期对话]\n${mem.shortTerm.map((m) => `${m.role}: ${m.content}`).join("\n")}`;
+    memoryContext += `[Dialog Terkini]\n${mem.shortTerm.map((m) => `${m.role}: ${m.content}`).join("\n")}`;
   }
-  return `## Memory\n以下是你对用户的记忆，可作为参考但不要主动提及：\n${memoryContext}`;
+  return `## Memori\nBerikut adalah memori Anda tentang pengguna, dapat dijadikan referensi tetapi jangan disebutkan secara aktif:\n${memoryContext}`;
 }
 
 export async function runDecisionAI(ctx: AgentContext) {
@@ -53,13 +53,13 @@ export async function runDecisionAI(ctx: AgentContext) {
   const novelData = await u.db("o_novel").where("projectId", resTool.data.projectId).select("chapterIndex");
 
   const projectInfo = [
-    "## 项目信息",
-    `小说名称：${projectData?.name ?? "未知"}`,
-    `小说类型：${projectData?.type ?? "未知"}`,
-    `小说简介：${projectData?.intro ?? "无"}`,
-    `目标改编影视视觉手册|画风：${projectData?.artStyle ?? "无"}`,
-    `目标改编视频画幅：${projectData?.videoRatio ?? "16:9"}`,
-    `章节数量：${novelData.length}章`,
+    "## Informasi Proyek",
+    `Nama novel: ${projectData?.name ?? "Tidak diketahui"}`,
+    `Jenis novel: ${projectData?.type ?? "Tidak diketahui"}`,
+    `Sinopsis novel: ${projectData?.intro ?? "Tidak ada"}`,
+    `Buku panduan visual adaptasi|Gaya seni: ${projectData?.artStyle ?? "Tidak ada"}`,
+    `Rasio video adaptasi: ${projectData?.videoRatio ?? "16:9"}`,
+    `Jumlah bab: ${novelData.length} bab`,
   ].join("\n");
 
   const { fullStream } = await u.Ai.Text("scriptAgent:decisionAgent", ctx.thinkConfig.think, ctx.thinkConfig.thinlLevel).stream({
@@ -128,30 +128,30 @@ function createSubAgent(parentCtx: AgentContext) {
       });
     }
 
-    parentCtx.msg = resTool.newMessage("assistant", "视频策划");
+    parentCtx.msg = resTool.newMessage("assistant", "Perencana Video");
     return fullResponse;
   }
 
   const promptInput = z
     .object({
-      prompt: z.string().describe("交给子Agent的任务简约描述，100字以内"),
+      prompt: z.string().describe("Deskripsi singkat tugas untuk subAgent, maksimal 100 karakter"),
     })
     .toJSONSchema();
 
   const run_sub_agent_storySkeleton = tool({
-    description: "运行执行subAgent来完成故事骨架相关任务",
+    description: "Menjalankan subAgent eksekusi untuk menyelesaikan tugas terkait kerangka cerita",
     inputSchema: jsonSchema<{ prompt: string }>(promptInput),
     execute: async ({ prompt }) => {
       const skill = path.join(u.getPath("skills"), "script_execution_skeleton.md");
       const systemPrompt = await fs.promises.readFile(skill, "utf-8");
 
-      const formatPrompt = "\n你必须使用如下XML格式写入工作区：\n<storySkeleton>故事骨架内容</storySkeleton>";
+      const formatPrompt = "\nAnda harus menggunakan format XML berikut untuk menulis ke ruang kerja:\n<storySkeleton>konten kerangka cerita</storySkeleton>";
 
       return runAgent({
         key: "scriptAgent:storySkeletonAgent",
         prompt,
         system: systemPrompt + formatPrompt,
-        name: "编剧",
+        name: "Penulis Naskah",
         memoryKey: "assistant:execution:storySkeleton",
         messages: [{ role: "user", content: prompt + formatPrompt }],
       });
@@ -159,19 +159,19 @@ function createSubAgent(parentCtx: AgentContext) {
   });
 
   const run_sub_agent_adaptationStrategy = tool({
-    description: "运行执行subAgent来完成改编策略相关任务",
+    description: "Menjalankan subAgent eksekusi untuk menyelesaikan tugas terkait strategi adaptasi",
     inputSchema: jsonSchema<{ prompt: string }>(promptInput),
     execute: async ({ prompt }) => {
       const skill = path.join(u.getPath("skills"), "script_execution_adaptation.md");
       const systemPrompt = await fs.promises.readFile(skill, "utf-8");
 
-      const formatPrompt = "\n你必须使用如下XML格式写入工作区：\n<adaptationStrategy>改编策略内容</adaptationStrategy>";
+      const formatPrompt = "\nAnda harus menggunakan format XML berikut untuk menulis ke ruang kerja:\n<adaptationStrategy>konten strategi adaptasi</adaptationStrategy>";
 
       return runAgent({
         key: "scriptAgent:adaptationStrategyAgent",
         prompt,
         system: systemPrompt + formatPrompt,
-        name: "编剧",
+        name: "Penulis Naskah",
         memoryKey: "assistant:execution:adaptationStrategy",
         messages: [{ role: "user", content: prompt + formatPrompt }],
       });
@@ -179,37 +179,37 @@ function createSubAgent(parentCtx: AgentContext) {
   });
 
   const run_sub_agent_script = tool({
-    description: "运行执行subAgent来完成剧本相关任务",
+    description: "Menjalankan subAgent eksekusi untuk menyelesaikan tugas terkait naskah",
     inputSchema: jsonSchema<{ prompt: string }>(promptInput),
     execute: async ({ prompt }) => {
       const skill = path.join(u.getPath("skills"), "script_execution_script.md");
       const systemPrompt = await fs.promises.readFile(skill, "utf-8");
 
       const scriptList = await u.db("o_script").where("projectId", resTool.data.projectId).select("id", "name");
-      const scriptPrompt = ["## 可用剧本(ID:名称)", scriptList.map((s: any) => `${s.id}:${(s.name || "").replace(/[,:]/g, "")}`).join(","), ""].join(
+      const scriptPrompt = ["## Naskah tersedia (ID:Nama)", scriptList.map((s: any) => `${s.id}:${(s.name || "").replace(/[,:]/g, "")}`).join(","), ""].join(
         "\n",
       );
 
       const novelData = await u.db("o_novel").where("projectId", resTool.data.projectId).select("chapterIndex");
 
-      const formatPrompt = `\n你必须使用如下XML格式写入工作区：\nXML不得添加任何额外标签<scriptItem name="剧本名称">剧本内容</scriptItem><scriptItem name="剧本名称">剧本内容</scriptItem><scriptItem name="剧本名称">剧本内容</scriptItem>`;
+      const formatPrompt = `\nAnda harus menggunakan format XML berikut untuk menulis ke ruang kerja:\nXML tidak boleh menambahkan tag tambahan apapun<scriptItem name="nama naskah">konten naskah</scriptItem><scriptItem name="nama naskah">konten naskah</scriptItem><scriptItem name="nama naskah">konten naskah</scriptItem>`;
 
       return runAgent({
         key: "scriptAgent:scriptAgent",
         prompt,
         system: systemPrompt + formatPrompt,
         messages: [
-          { role: "assistant", content: scriptPrompt + `章节数量：${novelData.length}章` },
+          { role: "assistant", content: scriptPrompt + `Jumlah bab: ${novelData.length} bab` },
           { role: "user", content: prompt + formatPrompt },
         ],
-        name: "编剧",
+        name: "Penulis Naskah",
         memoryKey: "assistant:execution:script",
       });
     },
   });
 
   const run_supervision_agent = tool({
-    description: "运行监督层subAgent执行独立任务，完成后返回结果",
+    description: "Menjalankan subAgent pengawas untuk mengeksekusi tugas independen, mengembalikan hasil setelah selesai",
     inputSchema: jsonSchema<{ prompt: string }>(promptInput),
     execute: async ({ prompt }) => {
       const skill = path.join(u.getPath("skills"), "script_agent_supervision.md");
@@ -219,7 +219,7 @@ function createSubAgent(parentCtx: AgentContext) {
         key: "scriptAgent:supervisionAgent",
         prompt,
         system: systemPrompt,
-        name: "编辑",
+        name: "Penyunting",
         memoryKey: "assistant:supervision",
       });
     },
@@ -256,12 +256,12 @@ async function consumeFullStream(
       }
       if (chunk.type === "reasoning-start") {
         thinkTime = Date.now();
-        thinking = msg.thinking("思考中...");
+        thinking = msg.thinking("Berpikir...");
       } else if (chunk.type === "reasoning-delta") {
         thinking?.append(chunk.text);
       } else if (chunk.type === "reasoning-end") {
         thinkTime = Date.now() - thinkTime;
-        thinking?.updateTitle(`思考完毕（${(thinkTime / 1000).toFixed(1)} 秒）`);
+        thinking?.updateTitle(`Pemikiran selesai（${(thinkTime / 1000).toFixed(1)} detik）`);
         thinking?.complete();
         thinking = null;
       } else if (chunk.type === "text-delta") {
