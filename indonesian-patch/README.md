@@ -2,15 +2,15 @@
 
 ## Overview
 
-Toonflow already includes Bahasa Indonesia (`id-ID`) locale support at ~94.5% coverage.
-This patch fills in the **88 missing translation keys** to achieve **100% coverage**.
+This patch adds complete **Bahasa Indonesia (`id-ID`)** locale support to Toonflow by injecting it directly into the compiled frontend (`data/web/index.html`).
+
+**Current version: v4.0** — safer injection with JavaScript syntax validation and auto-restore.
 
 ## Architecture Notes
 
 - **Toonflow is an Electron + Express desktop app** with a **pre-compiled Vue.js frontend**
 - All locale data is embedded in `data/web/index.html` as minified JavaScript
 - The i18n library is **vue-i18n v11.3.0** (Composition API mode)
-- The Indonesian locale variable is `fSi` in the compiled code
 - There are NO separate source files like `src/locales/` or `src/App.vue` in this repository
   — these would be in the Vue.js frontend source which is compiled before distribution
 
@@ -18,8 +18,8 @@ This patch fills in the **88 missing translation keys** to achieve **100% covera
 
 | File | Description |
 |------|-------------|
-| `id-ID.json` | Complete Indonesian locale with ALL 1,597 keys (reference only) |
-| `patch-indonesian.py` | Auto-patch script for `data/web/index.html` |
+| `id-ID.json` | Complete Indonesian locale with ALL 1,597 keys |
+| `patch-indonesian.py` | Auto-patch script for `data/web/index.html` (v4.0) |
 | `restore-original.py` | Restore script to undo the patch |
 
 ## How to Apply
@@ -29,173 +29,84 @@ This patch fills in the **88 missing translation keys** to achieve **100% covera
 ```bash
 # On your Windows machine, open Command Prompt or PowerShell:
 cd D:\Toonflow-app
-python patch-indonesian.py D:\Toonflow-app
+python indonesian-patch\patch-indonesian.py D:\Toonflow-app
 
 # Or if already in the project directory:
-python patch-indonesian.py
+python indonesian-patch\patch-indonesian.py
+
+# Preview what the patch will do (no files modified):
+python indonesian-patch\patch-indonesian.py D:\Toonflow-app --dry-run
 ```
 
 The script will:
-1. Find the `fSi={...}` variable in `data/web/index.html`
-2. Inject 88 missing flat dotted-key translations before the closing brace
-3. Create a backup at `data/web/index.html.bak`
-4. Verify the patch was applied correctly
+1. Detect the locale structure in your `index.html` (English & Chinese locale objects)
+2. Find the vue-i18n `messages:{...}` configuration
+3. Find the language selector array
+4. **Inject `"id-ID":{...}` directly into the messages object** (safer than v3)
+5. Add "Bahasa Indonesia" to the language selector
+6. Validate JavaScript syntax after patching (using `node --check` or bracket matching)
+7. **Auto-restore** if syntax validation fails
+8. Create a backup before writing
 
-### Method 2: Manual Verification
+### Method 2: Dry-Run First
 
-To verify the patch worked:
-1. Start Toonflow
-2. Go to Settings → Language
-3. Select "Bahasa Indonesia"
-4. Check that these previously-missing sections now appear in Indonesian:
-   - Settings → Model Mapping (Pemetaan Model)
-   - Settings → Developer Options (Opsi Pengembang)
-   - Vendor test dialog (Pengujian model)
+Always recommended before first use:
+
+```bash
+python indonesian-patch\patch-indonesian.py D:\Toonflow-app --dry-run
+```
+
+This shows:
+- What locale objects were detected
+- Where the injection will happen
+- Context around each injection point
+- No files are modified
 
 ### To Restore
 
 ```bash
-python restore-original.py D:\Toonflow-app
+python indonesian-patch\restore-original.py D:\Toonflow-app
 ```
 
-## 88 Missing Keys Translated
+Or manually:
+```bash
+copy "D:\Toonflow-app\data\web\index.html.before-id-patch-v4.0.bak" "D:\Toonflow-app\data\web\index.html"
+```
 
-### settings.vendor.test.* (37 keys) — Vendor test dialog
-| Key | Indonesian Translation |
-|-----|----------------------|
-| settings.vendor.test.textTitle | Pengujian Percakapan Teks |
-| settings.vendor.test.imageTitle | Pengujian Pembuatan Gambar |
-| settings.vendor.test.videoTitle | Pengujian Pembuatan Video |
-| settings.vendor.test.textEmptyHint | Kirim pesan untuk memulai pengujian |
-| settings.vendor.test.you | Anda |
-| settings.vendor.test.assistant | Asisten |
-| settings.vendor.test.textInputPlaceholder | Masukkan pesan, Ctrl+Enter untuk mengirim |
-| settings.vendor.test.send | Kirim |
-| settings.vendor.test.clearHistory | Bersihkan Percakapan |
-| settings.vendor.test.prompt | Prompt |
-| settings.vendor.test.promptPlaceholder | Masukkan prompt |
-| settings.vendor.test.videoPromptPlaceholder | Masukkan deskripsi video (opsional) |
-| settings.vendor.test.uploadImage | Klik atau seret untuk mengunggah gambar |
-| settings.vendor.test.uploadVideo | Klik atau seret untuk mengunggah video |
-| settings.vendor.test.uploadAudio | Klik atau seret untuk mengunggah audio |
-| settings.vendor.test.supportFormat | Mendukung JPG / PNG / WEBP |
-| settings.vendor.test.textToImage | Teks ke Gambar |
-| settings.vendor.test.imageToImage | Gambar ke Gambar |
-| settings.vendor.test.multiRef | Multi Referensi Gambar |
-| settings.vendor.test.textToVideo | Teks ke Video |
-| settings.vendor.test.singleImageMode | Referensi Gambar Tunggal |
-| settings.vendor.test.selectMode | Pilih Mode Pengujian |
-| settings.vendor.test.result | Hasil Pembuatan |
-| settings.vendor.test.startTest | Mulai Pengujian |
-| settings.vendor.test.cancel | Batal |
-| settings.vendor.test.referenceImage | Gambar Referensi |
-| settings.vendor.test.startFrame | Frame Awal (Wajib) |
-| settings.vendor.test.endFrame | Frame Akhir (Wajib) |
-| settings.vendor.test.startFrameOptional | Frame Awal (Opsional) |
-| settings.vendor.test.endFrameOptional | Frame Akhir (Opsional) |
-| settings.vendor.test.optional | Opsional |
-| settings.vendor.test.image | Gambar |
-| settings.vendor.test.video | Video |
-| settings.vendor.test.audio | Audio |
-| settings.vendor.test.multiRefDesc | Mode multi referensi |
-| settings.vendor.test.textToVideoDesc | Membuat video hanya dari deskripsi teks |
-| settings.vendor.test.singleImageDesc | Membuat video berdasarkan satu gambar referensi |
-| settings.vendor.test.startEndRequiredDesc | Frame awal dan frame akhir keduanya wajib disediakan |
-| settings.vendor.test.endFrameOptionalDesc | Frame awal wajib, frame akhir opsional |
-| settings.vendor.test.startFrameOptionalDesc | Frame akhir wajib, frame awal opsional |
+## Version History
 
-### settings.modelMap.* (16 keys) — Model mapping
-| Key | Indonesian Translation |
-|-----|----------------------|
-| settings.modelMap.imageModel | Model Gambar |
-| settings.modelMap.videoModel | Model Video |
-| settings.modelMap.noModel | Belum ada model gambar atau video yang tersedia, silakan tambahkan di «Layanan Model» terlebih dahulu |
-| settings.modelMap.promptPlaceholder | Masukkan prompt untuk mode ini |
-| settings.modelMap.save | Simpan Konfigurasi |
-| settings.modelMap.col.mode | Mode |
-| settings.modelMap.col.prompt | Prompt |
-| settings.modelMap.mode.text | Teks ke Gambar / Teks ke Video |
-| settings.modelMap.mode.singleImage | Gambar Tunggal |
-| settings.modelMap.mode.multiReference | Multi Referensi |
-| settings.modelMap.mode.startEndRequired | Frame Awal & Akhir (Keduanya Wajib) |
-| settings.modelMap.mode.endFrameOptional | Frame Awal & Akhir (Frame Akhir Opsional) |
-| settings.modelMap.mode.startFrameOptional | Frame Awal & Akhir (Frame Awal Opsional) |
-| settings.modelMap.mode.videoReference | Referensi Video |
-| settings.modelMap.mode.imageReference | Referensi Gambar |
-| settings.modelMap.mode.audioReference | Referensi Audio |
-| settings.modelMap.mode.referenceSuffix | Referensi |
-| settings.modelMap.msg.saveSuccess | Pemetaan prompt model tersimpan |
-| settings.modelMap.msg.saveFailed | Gagal menyimpan, silakan coba lagi nanti |
+### v4.0 (Current)
+- **SAFER**: Injects `"id-ID":{...}` directly into messages object — no separate variable declaration
+- **Syntax validation**: Checks JavaScript syntax after patching (node --check or bracket matching)
+- **Auto-restore**: If syntax check fails, automatically reverts to backup
+- **Dry-run mode**: `--dry-run` flag shows planned patches without modifying files
+- **Template literal handling**: Better handling of backtick strings in brace matching
+- **HTML-safe escaping**: Escapes `</script>` in JSON values
 
-### settings.memory.modelMap.* (12 keys) — Prompt management
-| Key | Indonesian Translation |
-|-----|----------------------|
-| settings.memory.modelMap.addPrompt | Tambah Prompt |
-| settings.memory.modelMap.addPromptTitle | Tambah Prompt |
-| settings.memory.modelMap.editPrompt | Edit |
-| settings.memory.modelMap.editPromptTitle | Edit Prompt |
-| settings.memory.modelMap.promptNamePlaceholder | Masukkan nama prompt |
-| settings.memory.modelMap.promptNameRequired | Silakan masukkan nama prompt |
-| settings.memory.modelMap.promptSaveSuccess | Berhasil disimpan |
-| settings.memory.modelMap.promptTypePlaceholder | Pilih tipe |
-| settings.memory.modelMap.typeText | Teks |
-| settings.memory.modelMap.typeImage | Gambar |
-| settings.memory.modelMap.typeVideo | Video |
+### v3.0 (Superseded)
+- Created separate `IDi={...}` variable and added to messages config
+- **Issue**: Injection position could break minified JS syntax
 
-### settings.menu.* (3 keys) — Menu items
-| Key | Indonesian Translation |
-|-----|----------------------|
-| settings.menu.ui | Pengaturan Antarmuka |
-| settings.menu.modelMap | Pemetaan Model |
-| settings.menu.devConfig | Opsi Pengembang |
+### v2.0 (Superseded)
+- Dynamic detection of locale variable names
+- **Issue**: Assumed existing id-ID locale
 
-### Other missing keys (8 keys)
-| Key | Indonesian Translation |
-|-----|----------------------|
-| settings.generate.modelChnageSure | Konfirmasi Pembersihan |
-| settings.other.openIsInteracting | Aktifkan |
-| settings.request.refresh | Segarkan |
-| storyboard.assetsNotExists | Aset tidak ada |
-| workbench.cornerScape.msg.emptyPrompt | Data yang dipilih {emptyPromptNames} prompt-nya kosong, silakan buat prompt terlebih dahulu |
-| workbench.generate.generateSuccess | Video berhasil dibuat |
-| workbench.generate.modeChange | Bersihkan Konten |
-| workbench.generate.modeChangeConfirm | Mengubah mode akan menghapus gambar dan prompt yang dipilih saat ini |
-| workbench.generate.prompt | Prompt Video |
-| workbench.generate.promptEmpty | Data yang dipilih untuk pembuatan video ada yang prompt-nya kosong, lanjutkan pembuatan? |
-| workbench.production.generate.statePending | Menunggu Produksi |
-| workbench.production.generate.stateSuccess | Berhasil Dibuat |
-| workbench.script.import.getAiRegex | Regex AI |
-| workbench.script.msg.extractFailed | Ekstraksi aset gagal |
-| workbench.script.msg.extracting | Mengekstrak aset |
+### v1.0 (Superseded)
+- Hardcoded `fSi` variable name
+- **Issue**: Variable names differ between builds
 
-## Technical Details
+## Troubleshooting
 
-### How the Patch Works
+### Patch fails with "Could not find Chinese settings variable"
+Your `index.html` may have a different structure. Look for a variable containing `"ToonFlow设置"` and report the surrounding code.
 
-The vue-i18n locale object `fSi` in the compiled HTML uses a combination of:
-1. **Nested object references** (e.g., `components:V6i, settings:z6i, workbench:Z6i, login:Y6i`)
-2. **Flat dotted-key strings** (e.g., `"workbench.script.msg.exportSuccess":"Skrip berhasil diekspor"`)
+### Patch succeeds but Toonflow won't open
+This shouldn't happen with v4.0 (syntax validation + auto-restore). If it does:
+1. Restore: `python restore-original.py`
+2. Check the backup file: `index.html.before-id-patch-v4.0.bak`
+3. Try dry-run mode first: `python patch-indonesian.py --dry-run`
 
-The flat dotted keys **merge/override** with the nested objects at runtime. By adding the missing
-keys as flat dotted strings, they will correctly resolve in the vue-i18n message lookup,
-even when the structured sections are defined via sub-variables.
-
-### Why No src/locales/ or src/App.vue Files
-
-The Toonflow repository does NOT include the Vue.js frontend source code. The frontend is
-pre-compiled and bundled into `data/web/index.html` as minified JavaScript. There are no
-`.vue` files, no `src/locales/` directory, and no separate locale JSON files in the repo.
-The only way to modify the UI translations is to patch the compiled `data/web/index.html`.
-
-### Supported Languages (Already in Toonflow)
-
-| Code | Language | Status |
-|------|----------|--------|
-| zh-CN | 简体中文 (Chinese Simplified) | Default |
-| zh-TW | 繁體中文 (Chinese Traditional) | Complete |
-| en | English | Partial |
-| th-TH | ไทย (Thai) | Partial |
-| vi-VN | Tiếng Việt (Vietnamese) | Partial |
-| ja-JP | 日本語 (Japanese) | Partial |
-| ru-RU | Русский (Russian) | Partial |
-| id-ID | Bahasa Indonesia | **100% (after this patch)** |
+### Language selector doesn't show Indonesian
+The language selector detection may have failed. You can manually add to the selector array in `index.html`:
+- Find: `{label:"...",tips:"...",value:"zh-CN"}`
+- Add: `{label:"Bahasa Indonesia",tips:"Indonesian",value:"id-ID"}`
