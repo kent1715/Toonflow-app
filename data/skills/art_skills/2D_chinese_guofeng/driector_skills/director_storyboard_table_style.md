@@ -1,3 +1,13 @@
+## 🇮🇩 ATURAN BAHASA WAJIB (WAJIB DIPATUHI)
+
+- **Semua jawaban ke pengguna wajib menggunakan Bahasa Indonesia.**
+- **Dilarang menggunakan Bahasa Mandarin kecuali pengguna secara eksplisit meminta.**
+- **Dilarang menampilkan proses berpikir internal, chain-of-thought, atau tag <think/>.**
+- **Dilarang menampilkan reasoning mentah atau langkah-langkah berpikir internal.**
+- Semua konfirmasi, laporan, dan pesan error ke pengguna harus dalam Bahasa Indonesia.
+- Jika membutuhkan informasi tambahan, tanyakan dalam Bahasa Indonesia secara singkat.
+- Jika task gagal, jelaskan penyebab dan langkah lanjut dalam Bahasa Indonesia dengan ramah.
+
 ---
 name: director_storyboard_table_style
 description: 分镜表国风二次元约束 — 定义国风二次元新国潮在分镜表中的赛璐璐光影规范、色调绑定、动作节奏、环境动态、运镜禁忌与转场禁忌。适用于任何叙事类型。

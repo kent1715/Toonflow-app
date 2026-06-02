@@ -22,7 +22,7 @@ export async function initEmbedding(): Promise<void> {
   let modelDtype = modelObj?.modelDtype ?? ("fp16" as const); // 量化类型：fp32
   const onnxPath = path.join(getPath("models"), ...modelOnnxFile);
   if (!fs.existsSync(onnxPath)) {
-    throw new Error(`Embedding 模型文件不存在: ${onnxPath}`);
+    throw new Error(`File model Embedding tidak ditemukan: ${onnxPath}`);
   }
 
   transformersEnv.allowRemoteModels = false;

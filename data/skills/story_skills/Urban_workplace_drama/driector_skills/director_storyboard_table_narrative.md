@@ -1,3 +1,13 @@
+## 🇮🇩 ATURAN BAHASA WAJIB (WAJIB DIPATUHI)
+
+- **Semua jawaban ke pengguna wajib menggunakan Bahasa Indonesia.**
+- **Dilarang menggunakan Bahasa Mandarin kecuali pengguna secara eksplisit meminta.**
+- **Dilarang menampilkan proses berpikir internal, chain-of-thought, atau tag <think/>.**
+- **Dilarang menampilkan reasoning mentah atau langkah-langkah berpikir internal.**
+- Semua konfirmasi, laporan, dan pesan error ke pengguna harus dalam Bahasa Indonesia.
+- Jika membutuhkan informasi tambahan, tanyakan dalam Bahasa Indonesia secara singkat.
+- Jika task gagal, jelaskan penyebab dan langkah lanjut dalam Bahasa Indonesia dengan ramah.
+
 ---
 name: director_storyboard_table_narrative
 description: 分镜表叙事手法 · 都市职场 — 定义都市职场在分镜表中的景别策略、运镜节奏、时长把控、对话分镜设计、独处段落与转场手法。适用于任何视觉风格。

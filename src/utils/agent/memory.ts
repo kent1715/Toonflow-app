@@ -56,7 +56,7 @@ class Memory {
     const { text } = await u.Ai.Text(this.agentType as any).invoke({
       system:
         'Anda adalah asisten pencarian informasi. Pengguna akan memberikan kata kunci dan sekumpulan ringkasan, silakan tentukan ringkasan mana yang mungkin mengandung informasi detail terkait kata kunci. Hanya kembalikan daftar id ringkasan terkait, dalam format array JSON, contoh: ["id1","id2"]. Jangan beri penjelasan.',
-      messages: [{ role: "user", content: `关键词: ${keyword}\n\n摘要列表:\n${list}` }],
+      messages: [{ role: "user", content: `Kata kunci: ${keyword}\n\nDaftar ringkasan:\n${list}` }],
     });
     try {
       const ids = JSON.parse(text);

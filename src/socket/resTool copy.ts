@@ -142,7 +142,7 @@ class MessageBuilder {
   }
 
   // 添加思考内容
-  thinking(title = "思考中...") {
+  thinking(title = "Berpikir...") {
     const contentId = u.uuid();
     const content: ThinkingContent = {
       type: "thinking",
@@ -160,7 +160,7 @@ class MessageBuilder {
   }
 
   // 添加搜索内容
-  search(title = "搜索中...") {
+  search(title = "Mencari...") {
     const contentId = u.uuid();
     const content: SearchContent = {
       type: "search",
@@ -500,7 +500,7 @@ class AutoThinkingTextStream extends ContentStream<string> {
 
   private ensureThinkingStream() {
     if (!this.thinkingStream) {
-      this.thinkingStream = this.messageBuilder.thinking("思考中...");
+      this.thinkingStream = this.messageBuilder.thinking("Berpikir...");
     }
     return this.thinkingStream;
   }

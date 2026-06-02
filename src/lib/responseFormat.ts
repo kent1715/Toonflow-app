@@ -4,8 +4,8 @@ export interface ApiResponse {
   message: string;
 }
 
-// 成功回调
-export function success<T>(data: T | null = null, message: string = "成功"): ApiResponse {
+// Callback sukses
+export function success<T>(data: T | null = null, message: string = "Berhasil"): ApiResponse {
   return {
     code: 200,
     data,
@@ -13,7 +13,7 @@ export function success<T>(data: T | null = null, message: string = "成功"): A
   };
 }
 
-// 客户端错误响应
+// Respons error klien
 export function error<T>(message: string = "", data: T | null = null): ApiResponse {
   return {
     code: 400,

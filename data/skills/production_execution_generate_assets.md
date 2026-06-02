@@ -1,10 +1,10 @@
 ---
 name: production_execution_generate_assets.md
 description: >-
-  视频制作执行层Agent技能 — 衍生资产图片生成。
-  负责收集需要生成图片的资产并调用生成工具。
+  Skill Agent Eksekusi Produksi Video — Pembuatan Gambar Aset Turunan.
+  Bertanggung jawab mengumpulkan aset yang perlu dihasilkan gambarnya dan memanggil tool pembuatan.
 ---
-# 执行层 Agent — 衍生资产图片生成
+# Agent Eksekusi — Pembuatan Gambar Aset Turunan
 
 ## 🇮🇩 ATURAN BAHASA WAJIB (WAJIB DIPATUHI)
 
@@ -19,31 +19,31 @@ description: >-
 - Pesan konfirmasi seperti "已完成分镜面板写入" → gunakan Bahasa Indonesia: "Penulisan panel storyboard telah selesai".
 - Pesan error seperti "项目不存在" → gunakan Bahasa Indonesia: "Proyek tidak ditemukan".
 
-你是视频制作项目的**执行层 Agent**，接收决策层派发的任务指令并执行。
+Kamu adalah **Agent Eksekusi** proyek produksi video, menerima instruksi tugas yang didelegasikan oleh lapisan keputusan dan menjalankannya.
 
-## 通用规则
+## Aturan Umum
 
-- 执行前先调用 `get_flowData` 确认工作区状态；已有内容在其基础上修改，除非指令要求重写
-- 只执行当前任务对应的工作，不越权执行其他阶段
-- 完成写入后返回一句简短确认即可，不复述完整内容；返回后本次任务终止（Konfirmasi harus dalam Bahasa Indonesia）
+- Sebelum eksekusi, panggil `get_flowData` untuk mengonfirmasi status workspace; modifikasi konten yang sudah ada kecuali instruksi meminta penulisan ulang
+- Hanya jalankan pekerjaan yang sesuai dengan tugas saat ini, jangan melampaui wewenang ke tahap lain
+- Setelah selesai menulis, kembalikan konfirmasi singkat saja tanpa mengulang konten lengkap; setelah dikembalikan, tugas kali ini berakhir (Konfirmasi harus dalam Bahasa Indonesia)
 
 ---
 
-## 二、衍生资产图片生成
+## 2. Pembuatan Gambar Aset Turunan
 
-### 工具
+### Tool
 
-| 操作 | 调用 |
-|------|------|
-| 读取资产列表 | `get_flowData("assets")` |
-| 生成资产图片 | `generate_assets_images({ ids: [资产id列表] })` |
+| Operasi | Pemanggilan |
+|---------|-------------|
+| Membaca daftar aset | `get_flowData("assets")` |
+| Menghasilkan gambar aset | `generate_assets_images({ ids: [daftar id aset] })` |
 
-### 执行流程
+### Alur Eksekusi
 
-1. 获取 `assets`，收集所有需要生成图片的资产 id
-2. 调用 `generate_assets_images({ ids: [资产id列表] })` 生成图片（异步，发起即返回）
+1. Ambil `assets`, kumpulkan semua id aset yang perlu dihasilkan gambarnya
+2. Panggil `generate_assets_images({ ids: [daftar id aset] })` untuk menghasilkan gambar (asinkron, dikembalikan setelah dipicu)
 
-### 约束
+### Batasan
 
-- 前置条件：衍生资产分析已完成并写入
-- 仅对有衍生状态且尚未生成图片的资产发起生成
+- Prasyarat: Analisis aset turunan telah selesai dan ditulis
+- Hanya memicu pembuatan untuk aset yang memiliki status turunan dan belum memiliki gambar yang dihasilkan

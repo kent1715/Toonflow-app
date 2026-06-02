@@ -32,7 +32,8 @@
     "dist:linux": "yarn build && electron-builder --linux",
     "debug:ai": "npx @ai-sdk/devtools",
     "license": "node scripts/license.ts",
-    "vendor2json": "node scripts/vendor2json.ts"
+    "vendor2json": "node scripts/vendor2json.ts",
+    "sync-skills": "npx tsx scripts/sync-skills-db.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.35",
@@ -91,6 +92,7 @@
     "electronmon": "^2.0.4",
     "license-checker": "^25.0.1",
     "nodemon": "^3.1.11",
+    "sql.js": "^1.14.1",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"
   },

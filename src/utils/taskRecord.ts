@@ -1,16 +1,16 @@
 import db from "@/utils/db";
 
 const taskStateMap = {
-  "0": "进行中",
-  "1": "已完成",
-  "-1": "生成失败",
+  "0": "Sedang berjalan",
+  "1": "Selesai",
+  "-1": "Gagal",
 };
 /**
- * 记录任务并返回结束函数
- * @param projectId  项目 ID
- * @param taskClass  任务分类
- * @param modelName   模型名称
- * @param opts       可选项：关联对象、任务描
+ * Mencatat tugas dan mengembalikan fungsi selesai
+ * @param projectId  ID Proyek
+ * @param taskClass  Klasifikasi tugas
+ * @param modelName   Nama model
+ * @param opts       Opsi: objek terkait, deskripsi tugas
  */
 export default async function taskRecord(
   projectId: number,
@@ -29,7 +29,7 @@ export default async function taskRecord(
   } else if (typeof content === "string") {
     opteorContent = content;
   } else if (typeof content === "function") {
-    throw new Error("不支持的类型");
+    throw new Error("Tipe tidak didukung");
   } else {
     try {
       opteorContent = JSON.stringify(content);
@@ -48,7 +48,7 @@ export default async function taskRecord(
     startTime: Date.now(),
   });
 
-  /** 任务成功时调用 done(1)，失败时调用 done(-1, '原因') */
+  /** Tugas berhasil panggil done(1), gagal panggil done(-1, 'alasan') */
   return async function done(state: 1 | -1, reason?: string) {
     await db("o_tasks")
       .where("id", id)

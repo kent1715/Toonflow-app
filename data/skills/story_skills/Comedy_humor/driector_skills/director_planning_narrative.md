@@ -1,3 +1,13 @@
+## 🇮🇩 ATURAN BAHASA WAJIB (WAJIB DIPATUHI)
+
+- **Semua jawaban ke pengguna wajib menggunakan Bahasa Indonesia.**
+- **Dilarang menggunakan Bahasa Mandarin kecuali pengguna secara eksplisit meminta.**
+- **Dilarang menampilkan proses berpikir internal, chain-of-thought, atau tag <think/>.**
+- **Dilarang menampilkan reasoning mentah atau langkah-langkah berpikir internal.**
+- Semua konfirmasi, laporan, dan pesan error ke pengguna harus dalam Bahasa Indonesia.
+- Jika membutuhkan informasi tambahan, tanyakan dalam Bahasa Indonesia secara singkat.
+- Jika task gagal, jelaskan penyebab dan langkah lanjut dalam Bahasa Indonesia dengan ramah.
+
 ---
 name: director_planning_narrative
 description: 叙事手法技法 · 喜剧搞笑 — 定义喜剧搞笑类型在主题立意、笑点节奏、场景喜感设计与声音方向上的叙事规划方法。适用于任何视觉风格。

@@ -1,3 +1,13 @@
+## 🇮🇩 ATURAN BAHASA WAJIB (WAJIB DIPATUHI)
+
+- **Semua jawaban ke pengguna wajib menggunakan Bahasa Indonesia.**
+- **Dilarang menggunakan Bahasa Mandarin kecuali pengguna secara eksplisit meminta.**
+- **Dilarang menampilkan proses berpikir internal, chain-of-thought, atau tag <think/>.**
+- **Dilarang menampilkan reasoning mentah atau langkah-langkah berpikir internal.**
+- Semua konfirmasi, laporan, dan pesan error ke pengguna harus dalam Bahasa Indonesia.
+- Jika membutuhkan informasi tambahan, tanyakan dalam Bahasa Indonesia secara singkat.
+- Jika task gagal, jelaskan penyebab dan langkah lanjut dalam Bahasa Indonesia dengan ramah.
+
 ---
 name: director_storyboard_table_narrative
 description: 分镜表叙事手法 · 心理博弈 — 定义心理博弈在分镜表中的景别博弈控制、运镜心理映射、时长张力、镜头合并与转场逻辑。适用于任何视觉风格。

@@ -142,7 +142,7 @@ class MessageBuilder {
   }
 
   // 添加思考内容
-  thinking(title = "思考中...") {
+  thinking(title = "Berpikir...") {
     const contentId = u.uuid();
     const content: ThinkingContent = {
       type: "thinking",
@@ -160,7 +160,7 @@ class MessageBuilder {
   }
 
   // 添加搜索内容
-  search(title = "搜索中...") {
+  search(title = "Mencari...") {
     const contentId = u.uuid();
     const content: SearchContent = {
       type: "search",
@@ -522,13 +522,13 @@ class AutoThinkingTextStream extends ContentStream<string> {
   private flushThinking(text: string) {
     if (!text) return;
     this.thinkingBuffer += text;
-    this.ensureThinkingStream().merge({ title: "思考中...", text: this.thinkingBuffer });
+    this.ensureThinkingStream().merge({ title: "Berpikir...", text: this.thinkingBuffer });
   }
 
   private ensureThinkingStream() {
     if (!this.thinkingStream) {
       this.thinkingStartTime = Date.now();
-      this.thinkingStream = this.messageBuilder.thinking("思考中...");
+      this.thinkingStream = this.messageBuilder.thinking("Berpikir...");
     }
     return this.thinkingStream;
   }
@@ -536,8 +536,8 @@ class AutoThinkingTextStream extends ContentStream<string> {
   private finishThinking() {
     if (this.thinkingStream) {
       const elapsed = ((Date.now() - this.thinkingStartTime) / 1000).toFixed(1);
-      this.thinkingStream.updateTitle(`思考完毕（${elapsed}秒）`);
-      this.thinkingStream.complete({ title: `思考完毕（${elapsed}秒）`, text: this.thinkingBuffer });
+      this.thinkingStream.updateTitle(`Pemikiran selesai（${elapsed} detik）`);
+      this.thinkingStream.complete({ title: `Pemikiran selesai（${elapsed} detik）`, text: this.thinkingBuffer });
       this.thinkingStream = null;
       this.thinkingBuffer = "";
     }

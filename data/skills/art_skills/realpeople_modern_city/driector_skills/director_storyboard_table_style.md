@@ -1,3 +1,13 @@
+## 🇮🇩 ATURAN BAHASA WAJIB (WAJIB DIPATUHI)
+
+- **Semua jawaban ke pengguna wajib menggunakan Bahasa Indonesia.**
+- **Dilarang menggunakan Bahasa Mandarin kecuali pengguna secara eksplisit meminta.**
+- **Dilarang menampilkan proses berpikir internal, chain-of-thought, atau tag <think/>.**
+- **Dilarang menampilkan reasoning mentah atau langkah-langkah berpikir internal.**
+- Semua konfirmasi, laporan, dan pesan error ke pengguna harus dalam Bahasa Indonesia.
+- Jika membutuhkan informasi tambahan, tanyakan dalam Bahasa Indonesia secara singkat.
+- Jika task gagal, jelaskan penyebab dan langkah lanjut dalam Bahasa Indonesia dengan ramah.
+
 ---
 name: liveaction_urban_storyboard_table
 description: 分镜表真人都市约束 — 定义真人都市风格在分镜表中的光影氛围规范、摄影质感、动作节奏、环境动态、运镜与转场禁忌，并针对Seedance 2.0做深度适配。适用于任何都市叙事类型。

@@ -245,7 +245,7 @@ async function createSubAgent(parentCtx: AgentContext) {
       const skill = path.join(u.getPath("skills"), "production_execution_director_plan.md");
       const systemPrompt = await fs.promises.readFile(skill, "utf-8");
 
-      const addPrompt = "\nAnda harus menggunakan format XML berikut untuk menulis ke ruang kerja:\n```\n<scriptPlan>内容</scriptPlan>\n```";
+      const addPrompt = "\nAnda harus menggunakan format XML berikut untuk menulis ke ruang kerja:\n```\n<scriptPlan>konten</scriptPlan>\n```";
 
       return runAgent({
         key: "productionAgent:directorPlanAgent",
@@ -287,7 +287,7 @@ async function createSubAgent(parentCtx: AgentContext) {
   // const mainSkills: { path: string; name: string; description: string }[] = [];
   // for (const skill of mainSkill) {
   //   const skillPath = path.join(rootDir, skill + ".md");
-  //   if (!fs.existsSync(skillPath)) throw new Error(`主技能文件不存在: ${skillPath}`);
+  //   if (!fs.existsSync(skillPath)) throw new Error(`File skill utama tidak ditemukan: ${skillPath}`);
   //   if (!isPathInside(skillPath, normalizedRootDir)) throw new Error(`技能名称无效：检测到路径穿越。${skillPath}`);
   //   const content = await fs.promises.readFile(skillPath, "utf-8");
   //   const parsed = parseFrontmatter(content);
@@ -305,7 +305,7 @@ async function createSubAgent(parentCtx: AgentContext) {
       const systemPrompt = await fs.promises.readFile(skill, "utf-8");
 
       const addPrompt =
-        "\nAnda harus menggunakan format XML berikut untuk menulis ke ruang kerja:\n```\n<storyboardItem videoDesc='视频描述' prompt=提示词内容 track='分组' shouldGenerateImage='true/false' duration='视频推荐时间' associateAssetsIds='[该分镜所需的资产ID列表]'></storyboardItem>\n```";
+        "\nAnda harus menggunakan format XML berikut untuk menulis ke ruang kerja:\n```\n<storyboardItem videoDesc='deskripsi video' prompt=konten_prompt track='grup' shouldGenerateImage='true/false' duration='durasi video yang disarankan' associateAssetsIds='[daftar ID aset yang diperlukan untuk storyboard ini]'></storyboardItem>\n```";
 
       return runAgent({
         key: "productionAgent:storyboardPanelAgent",
@@ -330,7 +330,7 @@ async function createSubAgent(parentCtx: AgentContext) {
       const skill = path.join(u.getPath("skills"), "production_execution_storyboard_table.md");
       const systemPrompt = await fs.promises.readFile(skill, "utf-8");
 
-      const addPrompt = "\nAnda harus menggunakan format XML berikut untuk menulis ke ruang kerja:\n```\n<storyboardTable>内容</storyboardTable>\n```";
+      const addPrompt = "\nAnda harus menggunakan format XML berikut untuk menulis ke ruang kerja:\n```\n<storyboardTable>konten</storyboardTable>\n```";
 
       return runAgent({
         key: "productionAgent:storyboardTableAgent",
@@ -380,7 +380,7 @@ async function createArtSkills(artName: string, storyName: string) {
   const skillList = [...(await scanSkills(artWorkerPath + "/*.md")), ...(await scanSkills(storyWorkerPath + "/*.md"))];
   const mainSkills: { path: string; name: string; description: string }[] = [];
   for (const skillPath of skillList) {
-    if (!fs.existsSync(skillPath)) throw new Error(`主技能文件不存在: ${skillPath}`);
+    if (!fs.existsSync(skillPath)) throw new Error(`File skill utama tidak ditemukan: ${skillPath}`);
     const content = await fs.promises.readFile(skillPath, "utf-8");
     const parsed = parseFrontmatter(content);
     mainSkills.push({ path: skillPath, ...parsed });
@@ -473,7 +473,7 @@ async function useProductionSkills(artName: string, storyName: string) {
   ];
   const mainSkills: { path: string; name: string; description: string }[] = [];
   for (const skillPath of skillList) {
-    if (!fs.existsSync(skillPath)) throw new Error(`主技能文件不存在: ${skillPath}`);
+    if (!fs.existsSync(skillPath)) throw new Error(`File skill utama tidak ditemukan: ${skillPath}`);
     const content = await fs.promises.readFile(skillPath, "utf-8");
     const parsed = parseFrontmatter(content);
     mainSkills.push({ path: skillPath, ...parsed });
