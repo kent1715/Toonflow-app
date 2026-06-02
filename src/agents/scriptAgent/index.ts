@@ -122,10 +122,23 @@ function createSubAgent(parentCtx: AgentContext) {
     const fullResponse = await consumeFullStream(fullStream, subMsg);
 
     if (fullResponse.trim()) {
+      // Debug logging: check XML tag presence
+      const xmlTagPatterns = ["storySkeleton", "adaptationStrategy", "scriptItem"];
+      for (const tag of xmlTagPatterns) {
+        const openRe = new RegExp(`<${tag}[\\s>]`);
+        const closeRe = new RegExp(`</${tag}>`);
+        if (openRe.test(fullResponse)) {
+          const hasClose = closeRe.test(fullResponse);
+          console.log(`[scriptAgent:debug] XML tag <${tag}> detected in ${key} — open: true, close: ${hasClose}`);
+        }
+      }
+
       await memory.add(memoryKey, removeAllXmlTags(fullResponse), {
         name,
         createTime: new Date(subMsg.datetime).getTime(),
       });
+    } else {
+      console.warn(`[scriptAgent:debug] Empty response from ${key}`);
     }
 
     parentCtx.msg = resTool.newMessage("assistant", "Perencana Video");
@@ -145,7 +158,30 @@ function createSubAgent(parentCtx: AgentContext) {
       const skill = path.join(u.getPath("skills"), "script_execution_skeleton.md");
       const systemPrompt = await fs.promises.readFile(skill, "utf-8");
 
-      const formatPrompt = "\nAnda harus menggunakan format XML berikut untuk menulis ke ruang kerja:\n<storySkeleton>konten kerangka cerita</storySkeleton>";
+      const formatPrompt = [
+        "",
+        "## ATURAN FORMAT OUTPUT (WAJIB DIPATUHI)",
+        "Output Anda HARUS berupa XML murni. Ketentuan:",
+        "1. SELURUH output harus dibungkus dalam tag: <storySkeleton>...</storySkeleton>",
+        "2. DILARANG menulis teks pembuka seperti 'Berikut kerangka cerita:' atau 'Ini adalah hasil:'",
+        "3. DILARANG menggunakan markdown (```xml, **, ##, dll) di luar tag XML",
+        "4. DILARANG menulis penjelasan, komentar, atau ringkasan di luar tag XML",
+        "5. Tag <storySkeleton> harus menjadi baris pertama output, dan </storySkeleton> harus menjadi baris terakhir",
+        "6. Konten di dalam tag boleh menggunakan Markdown untuk format internal",
+        "7. Setelah tag penutup </storySkeleton>, kembalikan SATU kalimat konfirmasi singkat",
+        "",
+        "Format yang BENAR:",
+        "<storySkeleton>",
+        "# Nama Karya - Kerangka Cerita",
+        "...(konten kerangka cerita dalam Markdown)...",
+        "</storySkeleton>",
+        "Kerangka cerita telah disimpan, silakan periksa di workbench sebelah kanan.",
+        "",
+        "Format yang SALAH (DILARANG):",
+        '"Berikut kerangka cerita:\n<storySkeleton>..." ← ada teks pembuka'",
+        '"```xml\n<storySkeleton>..." ← ada blok kode markdown'",
+        '"<storySkeleton>... penjelasan di luar tag ..." ← ada teks di luar tag'",
+      ].join("\n");
 
       return runAgent({
         key: "scriptAgent:storySkeletonAgent",
@@ -165,7 +201,30 @@ function createSubAgent(parentCtx: AgentContext) {
       const skill = path.join(u.getPath("skills"), "script_execution_adaptation.md");
       const systemPrompt = await fs.promises.readFile(skill, "utf-8");
 
-      const formatPrompt = "\nAnda harus menggunakan format XML berikut untuk menulis ke ruang kerja:\n<adaptationStrategy>konten strategi adaptasi</adaptationStrategy>";
+      const formatPrompt = [
+        "",
+        "## ATURAN FORMAT OUTPUT (WAJIB DIPATUHI)",
+        "Output Anda HARUS berupa XML murni. Ketentuan:",
+        "1. SELURUH output harus dibungkus dalam tag: <adaptationStrategy>...</adaptationStrategy>",
+        "2. DILARANG menulis teks pembuka seperti 'Berikut strategi adaptasi:' atau 'Ini adalah hasil:'",
+        "3. DILARANG menggunakan markdown (```xml, **, ##, dll) di luar tag XML",
+        "4. DILARANG menulis penjelasan, komentar, atau ringkasan di luar tag XML",
+        "5. Tag <adaptationStrategy> harus menjadi baris pertama output, dan </adaptationStrategy> harus menjadi baris terakhir",
+        "6. Konten di dalam tag boleh menggunakan Markdown untuk format internal",
+        "7. Setelah tag penutup </adaptationStrategy>, kembalikan SATU kalimat konfirmasi singkat",
+        "",
+        "Format yang BENAR:",
+        "<adaptationStrategy>",
+        "# Nama Karya - Catatan Keputusan Kunci",
+        "...(konten strategi adaptasi dalam Markdown)...",
+        "</adaptationStrategy>",
+        "Strategi adaptasi telah disimpan, silakan periksa di workbench sebelah kanan.",
+        "",
+        "Format yang SALAH (DILARANG):",
+        '"Berikut strategi adaptasi:\n<adaptationStrategy>..." ← ada teks pembuka'",
+        '"```xml\n<adaptationStrategy>..." ← ada blok kode markdown'",
+        '"<adaptationStrategy>... penjelasan di luar tag ..." ← ada teks di luar tag'",
+      ].join("\n");
 
       return runAgent({
         key: "scriptAgent:adaptationStrategyAgent",
@@ -192,7 +251,33 @@ function createSubAgent(parentCtx: AgentContext) {
 
       const novelData = await u.db("o_novel").where("projectId", resTool.data.projectId).select("chapterIndex");
 
-      const formatPrompt = `\nAnda harus menggunakan format XML berikut untuk menulis ke ruang kerja:\nXML tidak boleh menambahkan tag tambahan apapun<scriptItem name="nama naskah">konten naskah</scriptItem><scriptItem name="nama naskah">konten naskah</scriptItem><scriptItem name="nama naskah">konten naskah</scriptItem>`;
+      const formatPrompt = [
+        "",
+        "## ATURAN FORMAT OUTPUT (WAJIB DIPATUHI)",
+        "Output Anda HARUS berupa XML murni. Ketentuan:",
+        "1. SELURUH output harus dibungkus dalam tag: <scriptItem name=\"nama naskah\">...</scriptItem>",
+        "2. DILARANG menulis teks pembuka seperti 'Berikut naskah:' atau 'Ini adalah naskah:'",
+        "3. DILARANG menggunakan markdown (```xml, **, ##, dll) di luar tag XML",
+        "4. DILARANG menulis penjelasan, komentar, atau ringkasan di luar tag <scriptItem>",
+        "5. Tag <scriptItem> harus menjadi baris pertama output, dan </scriptItem> harus menjadi baris terakhir dari setiap naskah",
+        "6. Satu episode = satu tag <scriptItem>. Jika menulis beberapa episode, gunakan beberapa tag <scriptItem> berturut-turut",
+        "7. Nilai atribut name harus = judul baris pertama file header (tanpa tanda #)",
+        "8. Jangan tambahkan tag XML lain di luar <scriptItem>",
+        "9. Setelah tag penutup </scriptItem> terakhir, kembalikan SATU kalimat konfirmasi singkat",
+        "",
+        "Format yang BENAR:",
+        '<scriptItem name="Nama Karya EP01：Judul Episode">',
+        "# Nama Karya EP01：Judul Episode",
+        "...(konten naskah lengkap)...",
+        "</scriptItem>",
+        "Naskah episode X telah ditulis, silakan periksa di workbench.",
+        "",
+        "Format yang SALAH (DILARANG):",
+        '"Berikut naskah episode 1:\n<scriptItem>..." ← ada teks pembuka'",
+        '"```xml\n<scriptItem>..." ← ada blok kode markdown'",
+        '"<scriptItem>... penjelasan di luar tag ..." ← ada teks di luar tag'",
+        '"<script>...</script>" ← tag yang salah, harus <scriptItem>',
+      ].join("\n");
 
       return runAgent({
         key: "scriptAgent:scriptAgent",

@@ -163,6 +163,41 @@ Tokoh utama menghadapi masalah (empati) → Tidak ada yang bisa membantu (putus 
 - Tidak memproses permintaan penghapusan naskah, saat minta ingatkan: `Silakan hapus naskah secara manual di pengelolaan prop`
 - Setelah selesai menulis, kembalikan satu kalimat konfirmasi saja, tidak perlu mengulang konten; setelah dikembalikan, tugas ini berakhir (Konfirmasi harus dalam Bahasa Indonesia)
 
+## ⚠️ ATURAN FORMAT XML (KRITIS — PANEL TIDAK AKAN TERISI JIKA DILANGGAR)
+
+Output Anda dibaca oleh parser XML otomatis di frontend. Jika format tidak sesuai, **tab Naskah tidak akan terisi**.
+
+**WAJIB:**
+- Tag `<scriptItem name="...">` HARUS menjadi baris pertama output Anda untuk setiap episode
+- Tag `</scriptItem>` HARUS menutup setiap episode
+- SELURUH konten naskah HARUS berada di antara tag pembuka dan penutup
+- Konten di dalam tag BOLEH menggunakan Markdown untuk format internal
+- Satu episode = satu tag `<scriptItem>`, beberapa episode = beberapa tag berturut-turut
+- Nilai atribut `name` harus identik dengan judul baris pertama (tanpa `#`)
+
+**DILARANG KERAS:**
+- ❌ Menulis teks pembuka di luar tag (contoh: "Berikut naskah episode 1:", "Ini hasilnya:")
+- ❌ Membungkus XML dalam blok kode markdown (contoh: \`\`\`xml <scriptItem>...)
+- ❌ Menulis penjelasan, ringkasan, atau komentar di luar tag `<scriptItem>`
+- ❌ Menambahkan tag XML lain seperti `<script>` atau `<episode>` di luar `<scriptItem>`
+- ❌ Mengoutput hanya teks biasa tanpa tag XML
+
+**Contoh output yang BENAR:**
+```
+<scriptItem name="Nama Karya EP01：Judul Episode">
+# Nama Karya EP01：Judul Episode
+# Durasi target: 2 menit ≈ 300 karakter dialog
+...
+</scriptItem>
+Naskah episode 1 telah ditulis, silakan periksa di workbench.
+```
+
+**Contoh output yang SALAH (tab TIDAK terisi):**
+```
+Berikut naskah episode 1:                        ← ❌ teks pembuka
+<scriptItem name="...">...</scriptItem>           ← ✅ tag ada tapi ada teks sebelumnya
+```
+
 ## Batasan Penyelesaian
 
 - Setelah tugas selesai **langsung kembalikan konfirmasi singkat ke Agent utama**, dilarang mengoutput pratinjau, pengulangan, atau ringkasan apapun (seperti "Berikut pratinjau lengkap naskah episode ini:" "Berikut ikhtisar naskah episode X:" dll.)
