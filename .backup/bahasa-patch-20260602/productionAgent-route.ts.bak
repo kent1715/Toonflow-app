@@ -1,7 +1,7 @@
 import jwt from "jsonwebtoken";
 import u from "@/utils";
 import { Namespace, Socket } from "socket.io";
-import * as agent from "@/agents/scriptAgent/index";
+import * as agent from "@/agents/productionAgent/index";
 import ResTool from "@/socket/resTool";
 
 async function verifyToken(rawToken: string): Promise<Boolean> {
@@ -22,21 +22,22 @@ export default (nsp: Namespace) => {
   nsp.on("connection", async (socket: Socket) => {
     const token = socket.handshake.auth.token;
     if (!token || !(await verifyToken(token))) {
-      console.log("[scriptAgent] Koneksi gagal, token tidak valid");
+      console.log("[productionAgent] 连接失败，token无效");
       socket.disconnect();
       return;
     }
-    const isolationKey = socket.handshake.auth.isolationKey;
+    let isolationKey = socket.handshake.auth.isolationKey;
     if (!isolationKey) {
-      console.log("[scriptAgent] Koneksi gagal, isolationKey tidak ada");
+      console.log("[productionAgent] 连接失败，缺少 isolationKey");
       socket.disconnect();
       return;
     }
 
-    console.log("[scriptAgent] Terhubung:", socket.id);
+    console.log("[productionAgent] 已连接:", socket.id);
 
-    const resTool = new ResTool(socket, {
+    let resTool = new ResTool(socket, {
       projectId: socket.handshake.auth.projectId,
+      scriptId: socket.handshake.auth.scriptId,
     });
     let abortController: AbortController | null = null;
 
@@ -45,13 +46,23 @@ export default (nsp: Namespace) => {
       thinlLevel: 0,
     };
 
+    socket.on("updateContext", (data: { isolationKey: string; projectId: number; scriptId: number }, callback) => {
+      isolationKey = data.isolationKey;
+      resTool = new ResTool(socket, {
+        projectId: data.projectId,
+        scriptId: data.scriptId,
+      });
+      console.log("[productionAgent] 上下文已更新:", isolationKey);
+      callback?.({ success: true });
+    });
+
     socket.on("chat", async (data: { content: string }) => {
       const { content } = data;
       abortController?.abort();
       abortController = new AbortController();
       const currentController = abortController;
 
-      const msg = resTool.newMessage("assistant", "Koordinator Skrip");
+      const msg = resTool.newMessage("assistant", "视频策划");
       const ctx: agent.AgentContext = {
         socket,
         isolationKey,
@@ -67,8 +78,7 @@ export default (nsp: Namespace) => {
         await agent.runDecisionAI(ctx);
       } catch (err: any) {
         if (err.name !== "AbortError" && !currentController.signal.aborted) {
-          console.error("[scriptAgent] chat error:", u.error(err).message);
-          msg.error(u.error(err).message)
+          console.error("[productionAgent] chat error:", u.error(err).message);
         }
       } finally {
         if (abortController === currentController) {
@@ -80,7 +90,7 @@ export default (nsp: Namespace) => {
     socket.on("updateThinkConfig", (data: { think: boolean; thinlLevel: 0 | 1 | 2 | 3 }) => {
       thinkConfig.think = data.think;
       thinkConfig.thinlLevel = data.thinlLevel;
-      console.log("[scriptAgent] Konfigurasi pemikiran diperbarui:", thinkConfig);
+      console.log("[productionAgent] 更新思考配置:", thinkConfig);
     });
 
     socket.on("stop", () => {
@@ -89,6 +99,6 @@ export default (nsp: Namespace) => {
     });
   });
   nsp.on("disconnect", (socket: Socket) => {
-    console.log("[scriptAgent] Terputus:", socket.id);
+    console.log("[productionAgent] 已断开连接:", socket.id);
   });
 };

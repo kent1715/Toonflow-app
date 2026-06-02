@@ -22,18 +22,18 @@ export default (nsp: Namespace) => {
   nsp.on("connection", async (socket: Socket) => {
     const token = socket.handshake.auth.token;
     if (!token || !(await verifyToken(token))) {
-      console.log("[scriptAgent] Koneksi gagal, token tidak valid");
+      console.log("[scriptAgent] 连接失败，token无效");
       socket.disconnect();
       return;
     }
     const isolationKey = socket.handshake.auth.isolationKey;
     if (!isolationKey) {
-      console.log("[scriptAgent] Koneksi gagal, isolationKey tidak ada");
+      console.log("[scriptAgent] 连接失败，缺少 isolationKey");
       socket.disconnect();
       return;
     }
 
-    console.log("[scriptAgent] Terhubung:", socket.id);
+    console.log("[scriptAgent] 已连接:", socket.id);
 
     const resTool = new ResTool(socket, {
       projectId: socket.handshake.auth.projectId,
@@ -51,7 +51,7 @@ export default (nsp: Namespace) => {
       abortController = new AbortController();
       const currentController = abortController;
 
-      const msg = resTool.newMessage("assistant", "Koordinator Skrip");
+      const msg = resTool.newMessage("assistant", "统筹");
       const ctx: agent.AgentContext = {
         socket,
         isolationKey,
@@ -80,7 +80,7 @@ export default (nsp: Namespace) => {
     socket.on("updateThinkConfig", (data: { think: boolean; thinlLevel: 0 | 1 | 2 | 3 }) => {
       thinkConfig.think = data.think;
       thinkConfig.thinlLevel = data.thinlLevel;
-      console.log("[scriptAgent] Konfigurasi pemikiran diperbarui:", thinkConfig);
+      console.log("[scriptAgent] 更新思考配置:", thinkConfig);
     });
 
     socket.on("stop", () => {
@@ -89,6 +89,6 @@ export default (nsp: Namespace) => {
     });
   });
   nsp.on("disconnect", (socket: Socket) => {
-    console.log("[scriptAgent] Terputus:", socket.id);
+    console.log("[scriptAgent] 已断开连接:", socket.id);
   });
 };
