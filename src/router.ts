@@ -1,4 +1,4 @@
-// @routes-hash d3a4d7955a8f63d5cc1c769612bd48c2
+// @routes-hash updated-storygen-pipeline
 import { Express } from "express";
 
 import route1 from "./routes/agents/clearMemory";
@@ -168,6 +168,7 @@ import route164 from "./routes/task/getTaskApi";
 import route165 from "./routes/task/getTaskCategories";
 import route166 from "./routes/task/taskDetails";
 import route167 from "./routes/test/test";
+import route168 from "./routes/storygen/test";
 
 export default async (app: Express) => {
   app.use("/api/agents/clearMemory", route1);
@@ -337,4 +338,5 @@ export default async (app: Express) => {
   app.use("/api/task/getTaskCategories", route165);
   app.use("/api/task/taskDetails", route166);
   app.use("/api/test/test", route167);
+  app.use("/api/storygen/test", route168);
 }
